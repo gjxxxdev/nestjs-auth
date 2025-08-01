@@ -1,11 +1,16 @@
 // （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
+// （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
 import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiOperation, ApiUnauthorizedResponse, ApiResponse, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
 import { LoginResponseDto } from './dto/login-response.dto'; // 引入新的登入回應 DTO
-import { MessageResponseDto } from '../common/dto/message-response.dto';
+import { MessageResponseDto } from '../common/dto/message-response.dto'; // 引入 MessageResponseDto
+import { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto'; // 引入 ForgotPasswordResponseDto
+import { ResetPasswordResponseDto } from './dto/reset-password-response.dto'; // 引入 ResetPasswordResponseDto
+import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto'; // 引入 ForgotPasswordRequestDto
+import { ResetPasswordRequestDto } from './dto/reset-password-request.dto'; // 引入 ResetPasswordRequestDto
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -14,7 +19,8 @@ export class AuthController {
 
   @ApiUnauthorizedResponse({ description: 'Email 已註冊' })
   @ApiOperation({ summary: '使用 email 註冊帳號' })
-  @ApiResponse({ status: 201, description: '註冊成功，請查收驗證信件' })
+  // 註冊成功回應，狀態碼 201 表示資源已建立，並提供 MessageResponseDto 作為回應範例
+  @ApiResponse({ status: 201, description: '註冊成功，請查收驗證信件', type: MessageResponseDto })
   @ApiResponse({ status: 401, description: 'Email 已註冊' })
   @Post('register')
   async register(@Body() body: RegisterDto) {
@@ -90,8 +96,10 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: '找不到該 email 使用者' })
   @ApiUnauthorizedResponse({ description: '錯誤範例', schema: { example: { statusCode: 401, message: '帳號不存在', error: 'Unauthorized' } } })
   @ApiOperation({ summary: '發送忘記密碼信件' })
-  @ApiOkResponse({ description: '範例成功回應', type: MessageResponseDto })
-  @ApiOkResponse({ description: '重設密碼信件已發送' })
+  // 發送忘記密碼信件成功回應，狀態碼 200，並提供 ForgotPasswordResponseDto 作為回應範例
+  @ApiOkResponse({ description: '重設密碼信件已發送', type: ForgotPasswordResponseDto })
+  // 為發送忘記密碼信件請求體提供範例值
+  @ApiBody({ type: ForgotPasswordRequestDto })
   @Post('forgot-password')
   async forgotPassword(@Body('email') email: string) {
     return this.authService.forgotPassword(email);
@@ -100,8 +108,10 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'reset token 無效或過期' })
   @ApiUnauthorizedResponse({ description: '錯誤範例', schema: { example: { statusCode: 401, message: '重設連結已過期或無效', error: 'Unauthorized' } } })
   @ApiOperation({ summary: '重設密碼（需帶 reset token）' })
-  @ApiOkResponse({ description: '範例成功回應', type: MessageResponseDto })
-  @ApiOkResponse({ description: '密碼重設成功' })
+  // 重設密碼成功回應，狀態碼 200，並提供 ResetPasswordResponseDto 作為回應範例
+  @ApiOkResponse({ description: '密碼重設成功', type: ResetPasswordResponseDto })
+  // 為重設密碼請求體提供範例值
+  @ApiBody({ type: ResetPasswordRequestDto })
   @Post('reset-password')
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     return this.authService.resetPassword(body.token, body.newPassword);
