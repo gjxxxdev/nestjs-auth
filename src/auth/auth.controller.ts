@@ -1,16 +1,21 @@
 // （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
-// （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
 import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiOperation, ApiUnauthorizedResponse, ApiResponse, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
+import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto'; // 引入新的刷新令牌回應 DTO
 import { LoginResponseDto } from './dto/login-response.dto'; // 引入新的登入回應 DTO
 import { MessageResponseDto } from '../common/dto/message-response.dto'; // 引入 MessageResponseDto
+import { LogoutResponseDto } from './dto/logout-response.dto'; // 引入登出回應 DTO
+import { VerifyEmailResponseDto } from './dto/verify-email-response.dto'; // 引入 Email 驗證回應 DTO
 import { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto'; // 引入 ForgotPasswordResponseDto
 import { ResetPasswordResponseDto } from './dto/reset-password-response.dto'; // 引入 ResetPasswordResponseDto
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto'; // 引入 ForgotPasswordRequestDto
 import { ResetPasswordRequestDto } from './dto/reset-password-request.dto'; // 引入 ResetPasswordRequestDto
+import { RefreshTokenRequestDto } from './dto/refresh-token-request.dto'; // 引入刷新令牌請求 DTO
+import { LogoutRequestDto } from './dto/logout-request.dto'; // 引入登出請求 DTO
+import { VerifyEmailRequestDto } from './dto/verify-email-request.dto'; // 引入 Email 驗證請求 DTO
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -69,28 +74,29 @@ export class AuthController {
 
   @ApiUnauthorizedResponse({ description: 'refresh token 無效或信箱未驗證' })
   @ApiOperation({ summary: '使用 refresh token 取得新的 access token' })
-  @ApiOkResponse({ description: '成功取得新 accessToken', type: TokenResponseDto })
+  @ApiOkResponse({ description: '成功取得新 accessToken', type: RefreshTokenResponseDto })
+  @ApiBody({ type: RefreshTokenRequestDto }) // 為 refresh 請求體提供範例值
   @Post('refresh')
-  async refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Body() body: RefreshTokenRequestDto) {
+    return this.authService.refreshToken(body.refreshToken);
   }
   
   @ApiOperation({ summary: '使用者登出並將 refresh token 加入黑名單' })
-  @ApiOkResponse({ description: '範例成功回應', type: MessageResponseDto })
-  @ApiOkResponse({ description: '登出成功，Refresh token 已加入黑名單' })
+  @ApiOkResponse({ description: '登出成功，Refresh token 已加入黑名單', type: LogoutResponseDto })
+  @ApiBody({ type: LogoutRequestDto }) // 為 logout 請求體提供範例值
   @Post('logout')
-  async logout(@Body('refreshToken') refreshToken: string) {
-    return this.authService.logout(refreshToken);
+  async logout(@Body() body: LogoutRequestDto) {
+    return this.authService.logout(body.refreshToken);
   }
 
   @ApiUnauthorizedResponse({ description: '驗證連結已過期或無效' })
   @ApiUnauthorizedResponse({ description: '錯誤範例', schema: { example: { statusCode: 401, message: '驗證連結已過期或無效', error: 'Unauthorized' } } })
   @ApiOperation({ summary: '驗證使用者 email' })
-  @ApiOkResponse({ description: '信箱驗證成功' })
-  @ApiOkResponse({ description: '範例成功回應', type: MessageResponseDto })
+  @ApiOkResponse({ description: '信箱驗證成功', type: VerifyEmailResponseDto })
+  @ApiBody({ type: VerifyEmailRequestDto }) // 為 verifyEmail 請求體提供範例值
   @Post('verify-email')
-  async verifyEmail(@Body('token') token: string) {
-    return this.authService.verifyEmail(token);
+  async verifyEmail(@Body() body: VerifyEmailRequestDto) {
+    return this.authService.verifyEmail(body.token);
   }
 
   @ApiUnauthorizedResponse({ description: '找不到該 email 使用者' })

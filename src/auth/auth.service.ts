@@ -110,7 +110,7 @@ export class AuthService {
     return { success: true, accessToken, refreshToken, };
   }
 
-  // ✅ 註冊流程 - 建立帳號並寄送驗證信
+  // 註冊流程 - 建立帳號並寄送驗證信
 
   async register({ email, password, name }: { email: string; password: string; name?: string }) {
     const existing = await this.usersService.findByEmail(email);
