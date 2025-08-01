@@ -34,7 +34,7 @@ export class AuthService {
     const html = `請點擊下列連結重設您的密碼：<a href='${resetUrl}'>${resetUrl}</a>`;
     await this.mailService.sendMail({ to: user.email, subject: '重設密碼', html });
 
-    return { message: '已發送重設密碼信件' };
+    return { success: true, message: '已發送重設密碼信件' };
   }
 
   async resetPassword(token: string, newPassword: string) {
@@ -46,7 +46,7 @@ export class AuthService {
     await this.usersService.updatePassword(+userId, hashed);
     await this.redis.del(key);
 
-    return { message: '密碼已更新，請重新登入' };
+    return { success: true, message: '密碼已更新，請重新登入' };
   }
 
   async verifyEmail(token: string) {
@@ -60,7 +60,7 @@ export class AuthService {
     await this.usersService.markEmailVerified(+userId);
     await this.redis.del(key);
 
-    return { message: '信箱驗證成功' };
+    return { success: true, message: '信箱驗證成功' };
   }
 
   private getRefreshKey(token: string) {
@@ -72,7 +72,7 @@ export class AuthService {
     const ttl = this.configService.get('JWT_REFRESH_EXPIRES_IN') || '30d';
     const expiresInSec = 60 * 60 * 24 * 30;
     await this.redis.set(key, 'blacklisted', 'EX', expiresInSec);
-    return { message: '已登出' };
+    return { success: true, message: '已登出' };
   }
 
   async refreshToken(refreshToken: string) {
@@ -92,7 +92,7 @@ export class AuthService {
         { expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
       );
 
-      return { accessToken };
+      return { success: true, accessToken };
     } catch (err) {
       throw new UnauthorizedException('Refresh token 驗證失敗');
     }
@@ -107,7 +107,7 @@ export class AuthService {
       { userId },
       { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') }
     );
-    return { accessToken, refreshToken };
+    return { success: true, accessToken, refreshToken, };
   }
 
   // ✅ 註冊流程 - 建立帳號並寄送驗證信
@@ -127,7 +127,7 @@ export class AuthService {
     const content = `請點擊以下連結以驗證您的信箱：<a href='${verifyUrl}'>${verifyUrl}</a>`;
     await this.mailService.sendMail({ to: email, subject: '請驗證您的 Email', html: content });
 
-    return { message: '註冊成功，請查收驗證信件' };
+    return { success: true, message: '註冊成功，請查收驗證信件' };
   }
 
   // 調整 login / social login 統一呼叫 generateTokens()
@@ -154,7 +154,7 @@ export class AuthService {
     }
 
     const jwt = this.jwtService.sign({ userId: user.id });
-    return { accessToken: jwt };
+    return { success: true, accessToken: jwt };
   }
 
   // ✅ Facebook 登入
@@ -175,7 +175,7 @@ export class AuthService {
       }
 
       const jwt = this.jwtService.sign({ userId: user.id });
-      return { accessToken: jwt };
+      return { success: true, accessToken: jwt, };
     } catch (error) {
       throw new UnauthorizedException('Facebook token 驗證失敗');
     }  
@@ -214,7 +214,7 @@ export class AuthService {
     }
     
     const jwtToken = this.jwtService.sign({ userId: user.id });
-    return { accessToken: jwtToken };
+    return { success: true, accessToken: jwtToken };
   }
 
   // ✅ WeChat 登入
@@ -244,11 +244,19 @@ export class AuthService {
       }
   
       const jwtToken = this.jwtService.sign({ userId: user.id });
-      return { accessToken: jwtToken };
+      return { success: true, accessToken: jwtToken };
     } catch (err) {
       throw new UnauthorizedException('WeChat token 驗證失敗');
     }
   }
+  
+  // async login({ email, password }: { email: string; password: string }) {
+  //   const user = await this.usersService.findByEmail(email);
+  //   if (!user) throw new UnauthorizedException('帳號不存在');
+  //   if (!user.emailVerified) throw new UnauthorizedException('請先完成 Email 驗證');
+  //   const valid = await bcrypt.compare(password, user.password);
+  //   if (!valid) throw new UnauthorizedException('密碼錯誤');
+  // }
   
   async login({ email, password }: { email: string; password: string }) {
     const user = await this.usersService.findByEmail(email);
@@ -257,6 +265,6 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('密碼錯誤');
     const token = this.jwtService.sign({ userId: user.id });
-    return { accessToken: token };
+    return { success: true, accessToken: token };
   }
 }

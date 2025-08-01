@@ -1,9 +1,10 @@
 // （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
 import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { ApiTags, ApiOperation, ApiUnauthorizedResponse, ApiResponse, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiUnauthorizedResponse, ApiResponse, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
+import { LoginResponseDto } from './dto/login-response.dto'; // 引入新的登入回應 DTO
 import { MessageResponseDto } from '../common/dto/message-response.dto';
 
 @ApiTags('Auth')
@@ -16,20 +17,27 @@ export class AuthController {
   @ApiResponse({ status: 201, description: '註冊成功，請查收驗證信件' })
   @ApiResponse({ status: 401, description: 'Email 已註冊' })
   @Post('register')
-  async register(@Body() body) {
+  async register(@Body() body: RegisterDto) {
     return this.authService.register(body);
   }
   
   @ApiUnauthorizedResponse({ description: '帳號或密碼錯誤，或尚未驗證' })
   @ApiOperation({ summary: '使用 email 登入' })
-  @ApiResponse({ status: 200, description: '登入成功，回傳 accessToken' })
+  @ApiResponse({ status: 200, description: '登入成功，回傳 accessToken', type: LoginResponseDto }) // 為登入成功回應提供範例值
   @ApiResponse({ status: 401, description: '帳號或密碼錯誤，或尚未驗證' })
+  @ApiBody({ type: LoginDto }) // 為登入請求體提供範例值
   @Post('login')
-  async login(@Body() body) {
+  async login(@Body() body: LoginDto) {
     return this.authService.login(body);
   }
   
   @ApiOperation({ summary: 'Google 登入，接收 id_token' })
+  @ApiBody({ schema: {
+    type: 'object',
+    properties: {
+      idToken: { type: 'string', example: 'ya29.a0ARrdaM...' },
+    },
+  }})
   @Post('google-login')
   async googleLogin(@Body('idToken') idToken: string) {
     return this.authService.googleLogin(idToken);
