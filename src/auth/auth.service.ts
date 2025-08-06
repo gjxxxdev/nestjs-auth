@@ -132,7 +132,7 @@ export class AuthService {
 
   // 調整 login / social login 統一呼叫 generateTokens()
 
-  // ✅ Google 登入
+  // Google 登入
   async googleLogin(idToken: string) {
     const client = new OAuth2Client(this.configService.get('GOOGLE_CLIENT_ID'));
     const ticket = await client.verifyIdToken({

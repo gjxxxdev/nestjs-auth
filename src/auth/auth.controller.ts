@@ -6,6 +6,13 @@ import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto'; // 引入新的刷新令牌回應 DTO
 import { LoginResponseDto } from './dto/login-response.dto'; // 引入新的登入回應 DTO
+import { GoogleLoginResponseDto } from './dto/google-login-response.dto'; // 引入 Google 登入回應 DTO
+import { FacebookLoginResponseDto } from './dto/facebook-login-response.dto'; // 引入 Facebook 登入回應 DTO
+import { FacebookLoginRequestDto } from './dto/facebook-login-request.dto'; // 引入 Facebook 登入請求 DTO
+import { AppleLoginResponseDto } from './dto/apple-login-response.dto'; // 引入 Apple 登入回應 DTO
+import { AppleLoginRequestDto } from './dto/apple-login-request.dto'; // 引入 Apple 登入請求 DTO
+import { WechatLoginResponseDto } from './dto/wechat-login-response.dto'; // 引入 WeChat 登入回應 DTO
+import { WechatLoginRequestDto } from './dto/wechat-login-request.dto'; // 引入 WeChat 登入請求 DTO
 import { MessageResponseDto } from '../common/dto/message-response.dto'; // 引入 MessageResponseDto
 import { LogoutResponseDto } from './dto/logout-response.dto'; // 引入登出回應 DTO
 import { VerifyEmailResponseDto } from './dto/verify-email-response.dto'; // 引入 Email 驗證回應 DTO
@@ -49,27 +56,46 @@ export class AuthController {
       idToken: { type: 'string', example: 'ya29.a0ARrdaM...' },
     },
   }})
+  @ApiResponse({ status: 200, description: 'Google 登入成功', type: GoogleLoginResponseDto })
   @Post('google-login')
   async googleLogin(@Body('idToken') idToken: string) {
     return this.authService.googleLogin(idToken);
   }
   
   @ApiOperation({ summary: 'Facebook 登入，接收 accessToken' })
+  @ApiResponse({
+    status: 200,
+    description: 'Facebook 登入成功',
+    type: FacebookLoginResponseDto,
+  })
+  @ApiBody({ type: FacebookLoginRequestDto }) // 為 Facebook 登入請求體提供範例值
   @Post('facebook-login')
-  async facebookLogin(@Body('accessToken') accessToken: string) {
-    return this.authService.facebookLogin(accessToken);
+  async facebookLogin(@Body() body: FacebookLoginRequestDto) {
+    return this.authService.facebookLogin(body.accessToken);
   }
   
   @ApiOperation({ summary: 'Apple 登入，接收 id_token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Apple 登入成功',
+    type: AppleLoginResponseDto,
+  })
+  @ApiBody({ type: AppleLoginRequestDto }) // 為 Apple 登入請求體提供範例值
   @Post('apple-login')
-  async appleLogin(@Body('idToken') idToken: string) {
-    return this.authService.appleLogin(idToken);
+  async appleLogin(@Body() body: AppleLoginRequestDto) {
+    return this.authService.appleLogin(body.idToken);
   }
 
   @ApiOperation({ summary: 'WeChat 登入，接收授權 code' })
+  @ApiResponse({
+    status: 200,
+    description: 'WeChat 登入成功',
+    type: WechatLoginResponseDto,
+  })
+  @ApiBody({ type: WechatLoginRequestDto }) // 為 WeChat 登入請求體提供範例值
   @Post('wechat-login')
-  async wechatLogin(@Body('code') code: string) {
-    return this.authService.wechatLogin(code);
+  async wechatLogin(@Body() body: WechatLoginRequestDto) {
+    return this.authService.wechatLogin(body.code);
   }
 
   @ApiUnauthorizedResponse({ description: 'refresh token 無效或信箱未驗證' })
