@@ -14,13 +14,27 @@ import { MailService } from '../mail/mail.service'; // 導入 MailService
 
 @Injectable()
 export class AuthService {
+  private googleClients: OAuth2Client[];
+  private googleClientIds: string[];
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redis: Redis, // 來自 ioredis 套件注入
     private readonly mailService: MailService, // 注入 MailService
-  ) {}
+  ) {
+    // 初始化 Google OAuth2 客戶端，支援多個平台
+    this.googleClientIds = [
+      this.configService.get('GOOGLE_WEB_CLIENT_ID'),
+      this.configService.get('GOOGLE_ANDROID_CLIENT_ID'),
+      this.configService.get('GOOGLE_IOS_CLIENT_ID'),
+    ].filter(Boolean); // 過濾掉 undefined 或 null 的值
+
+    this.googleClients = this.googleClientIds.map(
+      (clientId) => new OAuth2Client(clientId),
+    );
+  }
 
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
@@ -132,32 +146,75 @@ export class AuthService {
 
   // 調整 login / social login 統一呼叫 generateTokens()
 
-  // Google 登入
+  /**
+   * 驗證 Google ID Token
+   * 嘗試使用多個 Google 客戶端 ID 驗證 ID Token。
+   * @param idToken Google 提供的 ID Token
+   * @returns 驗證成功後的 Payload
+   * @throws UnauthorizedException 如果 ID Token 無效或無法驗證
+   */
+  async verifyGoogleToken(idToken: string) {
+    // 遍歷所有配置的 Google 客戶端，嘗試驗證 ID Token
+    for (const client of this.googleClients) {
+      try {
+        const ticket = await client.verifyIdToken({ idToken });
+        const payload = ticket.getPayload();
+
+        // 額外驗證 aud (Audience) 和 iss (Issuer)
+        // 確保 aud 包含在已配置的 Google Client ID 列表中
+        if (!this.googleClientIds.includes(payload.aud)) {
+          throw new UnauthorizedException('不合法的 Google client ID');
+        }
+        // 確保 iss 是 Google 官方的發行者
+        if (
+          payload.iss !== 'https://accounts.google.com' &&
+          payload.iss !== 'accounts.google.com'
+        ) {
+          throw new UnauthorizedException('不合法的 Google Token 發行者');
+        }
+
+        return payload; // 驗證成功，返回 Payload
+      } catch (e) {
+        // 繼續嘗試下一個 client，如果當前 client 驗證失敗
+        console.error(`Google Token 驗證失敗 (Client ID: ${client._clientId}):`, e.message);
+      }
+    }
+    // 所有客戶端都無法驗證，拋出未授權異常
+    throw new UnauthorizedException('無效的 Google Token');
+  }
+
+  /**
+   * 處理 Google 登入
+   * 接收 Google ID Token，驗證後處理使用者登入或註冊。
+   * @param idToken Google 提供的 ID Token
+   * @returns 包含 accessToken 的登入成功回應
+   * @throws UnauthorizedException 如果 Google Token 無效或無法獲取 email
+   */
   async googleLogin(idToken: string) {
-    const client = new OAuth2Client(this.configService.get('GOOGLE_CLIENT_ID'));
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: this.configService.get('GOOGLE_CLIENT_ID'),
-    });
-    
-    const payload = ticket.getPayload();
+    // 使用 verifyGoogleToken 方法驗證 ID Token
+    const payload = await this.verifyGoogleToken(idToken);
+
+    // 檢查 Payload 中是否存在 email
     if (!payload?.email) throw new UnauthorizedException('Google 回傳無 email');
 
+    // 根據 email 查找或創建使用者
     let user = await this.usersService.findByEmail(payload.email);
     if (!user) {
+      // 如果使用者不存在，則創建新使用者
       user = await this.usersService.create({
         email: payload.email,
-        password: '',
-        provider: 'google',
-        name: payload.name,
+        password: '', // 社交登入通常不需要密碼
+        provider: 'google', // 設定提供者為 Google
+        name: payload.name, // 使用 Google 提供的名稱
       });
     }
 
-    const jwt = this.jwtService.sign({ userId: user.id });
-    return { success: true, accessToken: jwt };
+    // 生成 JWT Token 並返回
+    const { accessToken } = this.generateTokens(user.id);
+    return { success: true, accessToken };
   }
 
-  // ✅ Facebook 登入
+  // Facebook 登入
   async facebookLogin(accessToken: string) {
     try {
       const url = `https://graph.facebook.com/me?fields=id,email,name&access_token=${accessToken}`;
@@ -181,7 +238,7 @@ export class AuthService {
     }  
   }
 
-  // ✅ Apple 登入
+  // Apple 登入
   async appleLogin(idToken: string) {
     const client = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' });
     const decoded = jwt.decode(idToken, { complete: true });
@@ -217,7 +274,7 @@ export class AuthService {
     return { success: true, accessToken: jwtToken };
   }
 
-  // ✅ WeChat 登入
+  // WeChat 登入
   async wechatLogin(code: string) {
     const appId = this.configService.get('WECHAT_APP_ID');
     const appSecret = this.configService.get('WECHAT_APP_SECRET');
