@@ -77,6 +77,42 @@ export class AuthService {
     return { success: true, message: '信箱驗證成功' };
   }
 
+  /**
+   * 重新發送 Email 驗證信
+   * 查找使用者，如果使用者存在且未驗證，則生成新的驗證令牌並發送郵件。
+   * @param email 使用者的電子郵件
+   * @returns 包含成功訊息的回應
+   * @throws UnauthorizedException 如果找不到使用者或信箱已驗證
+   */
+  async resendVerification(email: string) {
+    // 根據 email 查找使用者
+    const user = await this.usersService.findByEmail(email);
+    // 如果找不到使用者，拋出未授權異常
+    if (!user) {
+      throw new UnauthorizedException('找不到該 email 使用者');
+    }
+    // 如果信箱已經驗證，拋出未授權異常
+    if (user.emailVerified) {
+      throw new UnauthorizedException('信箱已驗證，無需重新發送');
+    }
+
+    // 生成新的驗證令牌
+    const verifyToken = uuidv4();
+    // 將令牌存入 Redis，設定過期時間為 24 小時
+    const redisKey = `verify:${verifyToken}`;
+    await this.redis.set(redisKey, user.id, 'EX', 60 * 60 * 24); // 24 小時
+
+    // 構建驗證連結
+    const verifyUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verifyToken}`;
+    // 構建郵件內容
+    const content = `請點擊以下連結以驗證您的信箱：<a href='${verifyUrl}'>${verifyUrl}</a>`;
+    // 發送驗證郵件
+    await this.mailService.sendMail({ to: email, subject: '請驗證您的 Email', html: content });
+
+    // 返回成功訊息
+    return { success: true, message: '驗證信已重新發送' };
+  }
+
   private getRefreshKey(token: string) {
     return `bl:refresh:${token}`;
   }

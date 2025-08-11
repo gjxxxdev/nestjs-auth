@@ -16,6 +16,7 @@ import { WechatLoginRequestDto } from './dto/wechat-login-request.dto'; // 引�
 import { MessageResponseDto } from '../common/dto/message-response.dto'; // 引入 MessageResponseDto
 import { LogoutResponseDto } from './dto/logout-response.dto'; // 引入登出回應 DTO
 import { VerifyEmailResponseDto } from './dto/verify-email-response.dto'; // 引入 Email 驗證回應 DTO
+import { ResendVerificationResponseDto } from './dto/resend-verification-response.dto'; // 引入重新發送驗證信回應 DTO
 import { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto'; // 引入 ForgotPasswordResponseDto
 import { ResetPasswordResponseDto } from './dto/reset-password-response.dto'; // 引入 ResetPasswordResponseDto
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto'; // 引入 ForgotPasswordRequestDto
@@ -23,6 +24,7 @@ import { ResetPasswordRequestDto } from './dto/reset-password-request.dto'; // �
 import { RefreshTokenRequestDto } from './dto/refresh-token-request.dto'; // 引入刷新令牌請求 DTO
 import { LogoutRequestDto } from './dto/logout-request.dto'; // 引入登出請求 DTO
 import { VerifyEmailRequestDto } from './dto/verify-email-request.dto'; // 引入 Email 驗證請求 DTO
+import { ResendVerificationRequestDto } from './dto/resend-verification-request.dto'; // 引入重新發送驗證信請求 DTO
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -123,6 +125,15 @@ export class AuthController {
   @Post('verify-email')
   async verifyEmail(@Body() body: VerifyEmailRequestDto) {
     return this.authService.verifyEmail(body.token);
+  }
+
+  @ApiOperation({ summary: '重新發送 Email 驗證信' })
+  @ApiOkResponse({ description: '驗證信已重新發送', type: ResendVerificationResponseDto })
+  @ApiUnauthorizedResponse({ description: '找不到該 email 使用者或信箱已驗證' })
+  @ApiBody({ type: ResendVerificationRequestDto }) // 為重新發送驗證信請求體提供範例值
+  @Post('resend-verification')
+  async resendVerification(@Body() body: ResendVerificationRequestDto) {
+    return this.authService.resendVerification(body.email);
   }
 
   @ApiUnauthorizedResponse({ description: '找不到該 email 使用者' })
