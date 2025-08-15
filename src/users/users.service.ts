@@ -81,4 +81,27 @@ export class UsersService {
       data: { password: newPassword },
     });
   }
+
+  /**
+   * 建立社交登入使用者
+   * Create a social login user
+   * @param data 社交使用者資料，包含 email, provider, providerId, name (可選)
+   * Social user data, including email, provider, providerId, name (optional)
+   * @returns 新建立的使用者資料
+   * Newly created user data
+   */
+  async createSocialUser(data: { email: string; provider: string; providerId: string; name?: string }) {
+    return this.prisma.user.create({
+      data: {
+        email: data.email,
+        password: '', // 社交登入使用者通常不需要密碼
+        // Social login users usually don't need a password
+        provider: data.provider,
+        providerId: data.providerId,
+        name: data.name,
+        emailVerified: true, // 社交登入通常視為已驗證
+        // Social logins are usually considered verified
+      },
+    });
+  }
 }

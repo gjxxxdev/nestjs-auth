@@ -6,7 +6,7 @@ import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
+import * as jwksClient from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { v4 as uuidv4 } from 'uuid'; // 導入 uuidv4
@@ -274,40 +274,73 @@ export class AuthService {
     }  
   }
 
-  // Apple 登入
+  /**
+   * 處理 Apple 登入
+   * 接收 Apple ID Token，驗證後處理使用者登入或註冊。
+   * @param idToken Apple 提供的 ID Token
+   * @returns 包含 accessToken 和 refreshToken 的登入成功回應
+   * @throws UnauthorizedException 如果 Apple ID Token 無效或驗證失敗
+   */
   async appleLogin(idToken: string) {
-    const client = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' });
-    const decoded = jwt.decode(idToken, { complete: true });
-    if (!decoded || typeof decoded === 'string') throw new UnauthorizedException('無法解析 Apple idToken');
-
-    const kid = decoded.header.kid;
-    const key = await client.getSigningKey(kid);
-    const signingKey = key.getPublicKey();
-
-    let payload: any;
     try {
-      payload = jwt.verify(idToken, signingKey, {
+      // 建立 JWKS Client
+      // Create JWKS Client
+      const client = jwksClient({
+        jwksUri: 'https://appleid.apple.com/auth/keys',
+      });
+
+      // 解析 JWT header 取得 kid
+      // Parse JWT header to get kid
+      const decodedHeader = this.jwtService.decode(idToken, { complete: true }) as any;
+      if (!decodedHeader || !decodedHeader.header.kid) {
+        throw new UnauthorizedException('無效的 Apple id_token');
+      }
+
+      // 從 Apple 公開金鑰服務取得金鑰
+      // Get the key from Apple's public key service
+      const key = await client.getSigningKey(decodedHeader.header.kid);
+      const signingKey = key.getPublicKey();
+
+      // 驗證 JWT
+      // Verify JWT
+      const payload = this.jwtService.verify(idToken, {
         algorithms: ['RS256'],
-        issuer: 'https://appleid.apple.com',
+        publicKey: signingKey,
       });
-    } catch {
-      throw new UnauthorizedException('Apple token 驗證失敗');
-    }
 
-    if (!payload.email) throw new UnauthorizedException('Apple 回傳無 email');
+      // 檢查 iss 與 aud
+      // Check iss and aud
+      if (payload.iss !== 'https://appleid.apple.com') {
+        throw new UnauthorizedException('Apple id_token 來源不合法');
+      }
+      if (payload.aud !== process.env.APPLE_CLIENT_ID) {
+        throw new UnauthorizedException('Apple Client ID 不匹配');
+      }
 
-    let user = await this.usersService.findByEmail(payload.email);
-    if (!user) {
-      user = await this.usersService.create({
-        email: payload.email,
-        password: '',
-        provider: 'apple',
-        name: '',
-      });
+      // Apple 預設用 sub 當唯一識別碼
+      // Apple uses sub as the unique identifier by default
+      const email = payload.email || `${payload.sub}@apple.com`;
+
+      // 查詢或建立使用者
+      // Query or create user
+      let user = await this.usersService.findByEmail(email);
+      if (!user) {
+        user = await this.usersService.createSocialUser({
+          email,
+          provider: 'apple',
+          providerId: payload.sub,
+        });
+      }
+
+      // 產生 JWT token
+      // Generate JWT token
+      return this.generateTokens(user.id);
+
+    } catch (error) {
+      console.error('Apple 登入錯誤:', error); // 記錄錯誤訊息
+      // Log error message
+      throw new UnauthorizedException('Apple 登入驗證失敗');
     }
-    
-    const jwtToken = this.jwtService.sign({ userId: user.id });
-    return { success: true, accessToken: jwtToken };
   }
 
   // WeChat 登入
