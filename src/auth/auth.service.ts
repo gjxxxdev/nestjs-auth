@@ -303,11 +303,10 @@ export class AuthService {
 
       // 驗證 JWT
       // Verify JWT
-      const payload = this.jwtService.verify(idToken, {
+      const payload = jwt.verify(idToken, signingKey, {
         algorithms: ['RS256'],
-        publicKey: signingKey, // 使用 publicKey 屬性傳遞公開金鑰
-        // Use publicKey property to pass the public key
-      });
+      }) as any; // 使用 jwt 模組直接驗證，並斷言為 any 類型以方便後續操作
+      // Use jwt module to verify directly, and assert as any type for easier subsequent operations
 
       // 檢查 iss 與 aud
       // Check iss and aud
