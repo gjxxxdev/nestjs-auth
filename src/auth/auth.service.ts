@@ -305,7 +305,8 @@ export class AuthService {
       // Verify JWT
       const payload = this.jwtService.verify(idToken, {
         algorithms: ['RS256'],
-        publicKey: signingKey,
+        publicKey: signingKey, // 使用 publicKey 屬性傳遞公開金鑰
+        // Use publicKey property to pass the public key
       });
 
       // 檢查 iss 與 aud
