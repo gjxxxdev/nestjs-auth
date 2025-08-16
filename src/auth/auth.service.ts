@@ -246,11 +246,12 @@ export class AuthService {
     }
 
     // 生成 JWT Token 並返回
-    const { accessToken } = this.generateTokens(user.id);
-    return { success: true, accessToken };
+    // Generate JWT Token and return
+    return this.generateTokens(user.id);
   }
 
   // Facebook 登入
+  // Facebook Login
   async facebookLogin(accessToken: string) {
     try {
       const url = `https://graph.facebook.com/me?fields=id,email,name&access_token=${accessToken}`;
@@ -267,8 +268,9 @@ export class AuthService {
         });
       }
 
-      const jwt = this.jwtService.sign({ userId: user.id });
-      return { success: true, accessToken: jwt, };
+      // 產生 JWT token
+      // Generate JWT token
+      return this.generateTokens(user.id);
     } catch (error) {
       throw new UnauthorizedException('Facebook token 驗證失敗');
     }  
@@ -344,6 +346,7 @@ export class AuthService {
   }
 
   // WeChat 登入
+  // WeChat Login
   async wechatLogin(code: string) {
     const appId = this.configService.get('WECHAT_APP_ID');
     const appSecret = this.configService.get('WECHAT_APP_SECRET');
@@ -356,6 +359,7 @@ export class AuthService {
       if (!openid) throw new UnauthorizedException('WeChat 回傳無 openid');
   
       // 若有 unionid 更佳，否則使用 openid
+      // If unionid is available, use it; otherwise, use openid
       const identifier = unionid || openid;
       const email = `${identifier}@wechat.fake`; // 模擬 email 做為唯一 key
   
@@ -369,8 +373,9 @@ export class AuthService {
         });
       }
   
-      const jwtToken = this.jwtService.sign({ userId: user.id });
-      return { success: true, accessToken: jwtToken };
+      // 產生 JWT token
+      // Generate JWT token
+      return this.generateTokens(user.id);
     } catch (err) {
       throw new UnauthorizedException('WeChat token 驗證失敗');
     }
@@ -390,7 +395,8 @@ export class AuthService {
     if (!user.emailVerified) throw new UnauthorizedException('請先完成 Email 驗證');
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('密碼錯誤');
-    const token = this.jwtService.sign({ userId: user.id });
-    return { success: true, accessToken: token };
+    // 產生 JWT token
+    // Generate JWT token
+    return this.generateTokens(user.id);
   }
 }
