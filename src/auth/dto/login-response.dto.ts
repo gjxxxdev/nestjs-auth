@@ -7,4 +7,7 @@ export class LoginResponseDto {
 
     @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6...', description: '使用者存取令牌' })
     accessToken: string;
+
+    @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6...', description: '使用者刷新令牌' })
+    refreshToken: string;
 }
