@@ -10,11 +10,11 @@ import { IsString, IsNotEmpty } from 'class-validator';
 export class FacebookLoginRequestDto {
   /**
    * @property {string} accessToken
-   * @description Facebook 提供的存取令牌。
-   * @example "EAACwZCZC..."
+   * @description Facebook 提供的存取令牌，可以是標準的 access token，也可以是 iOS Limited Login 的 user_token。
+   * @example "EAACwZCZC..." // iOS 傳 JWT(id_token), web/Android 傳 access_token
    */
   @ApiProperty({
-    description: 'Facebook 提供的存取令牌',
+    description: 'Facebook 提供的存取令牌,iOS 傳 JWT(id_token), web/Android 傳 access_token',
     example: 'EAACwZCZC...',
   })
   @IsString()

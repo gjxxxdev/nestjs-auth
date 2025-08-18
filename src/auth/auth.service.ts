@@ -250,30 +250,70 @@ export class AuthService {
     return this.generateTokens(user.id);
   }
 
-  // Facebook 登入
-  // Facebook Login
+  /**
+   * 處理 Facebook 登入，自動判斷是 Limited Login 還是標準 Access Token。
+   * @param accessToken Facebook 提供的存取令牌，可能是 Limited Login 的 user_token 或標準 access_token。
+   * @returns 包含 accessToken 和 refreshToken 的登入成功回應。
+   * @throws UnauthorizedException 如果 Facebook token 無效或無法獲取 email。
+   */
   async facebookLogin(accessToken: string) {
-    try {
-      const url = `https://graph.facebook.com/me?fields=id,email,name&access_token=${accessToken}`;
-      const { data } = await axios.get(url);
-      if (!data.email) throw new UnauthorizedException('Facebook 回傳無 email');
-  
-      let user = await this.usersService.findByEmail(data.email);
-      if (!user) {
-        user = await this.usersService.create({
-          email: data.email,
-          password: '',
-          provider: 'facebook',
-          name: data.name,
-        });
-      }
+    // 從配置服務中獲取 Facebook 應用程式 ID 和密鑰
+    // Get Facebook App ID and App Secret from config service
+    const appId = this.configService.get('FACEBOOK_APP_ID');
+    const appSecret = this.configService.get('FACEBOOK_APP_SECRET');
 
-      // 產生 JWT token
-      // Generate JWT token
-      return this.generateTokens(user.id);
-    } catch (error) {
-      throw new UnauthorizedException('Facebook token 驗證失敗');
-    }  
+    let facebookData;
+
+    try {
+      // 嘗試作為 Limited Login token 進行交換
+      // Try to exchange as a Limited Login token
+      const limitedLoginExchangeUrl = `https://graph.facebook.com/oauth/access_token?grant_type=fb_limited_login&client_id=${appId}&client_secret=${appSecret}&access_token=${accessToken}`;
+      const exchangeRes = await axios.get(limitedLoginExchangeUrl);
+      const fullAccessToken = exchangeRes.data.access_token;
+
+      // 使用交換後獲得的完整 access token 獲取用戶資料
+      // Use the obtained full access token to get user data
+      const graphApiUrl = `https://graph.facebook.com/me?fields=id,email,name&access_token=${fullAccessToken}`;
+      const { data } = await axios.get(graphApiUrl);
+      facebookData = data;
+
+    } catch (limitedLoginError) {
+      // 如果 Limited Login 交換失敗，則嘗試作為一般 access token 處理
+      // If Limited Login exchange fails, try to process as a general access token
+      console.warn('Limited Login token exchange failed, trying as general access token:', limitedLoginError.message);
+      try {
+        const graphApiUrl = `https://graph.facebook.com/me?fields=id,email,name&access_token=${accessToken}`;
+        const { data } = await axios.get(graphApiUrl);
+        facebookData = data;
+      } catch (generalLoginError) {
+        // 如果兩種方式都失敗，則拋出錯誤
+        // If both methods fail, throw an error
+        console.error('Facebook token verification failed for both Limited and General Login:', generalLoginError.message);
+        throw new UnauthorizedException('Facebook token 驗證失敗');
+      }
+    }
+
+    // 檢查是否成功獲取到 email
+    // Check if email was successfully obtained
+    if (!facebookData?.email) {
+      throw new UnauthorizedException('Facebook 回傳無 email');
+    }
+
+    // 根據 email 查找或創建使用者
+    // Find or create user by email
+    let user = await this.usersService.findByEmail(facebookData.email);
+    if (!user) {
+      user = await this.usersService.create({
+        email: facebookData.email,
+        password: '',
+        provider: 'facebook',
+        name: facebookData.name, // Limited Login 可能沒有 name，需要處理
+      });
+    }
+
+    // 產生 JWT token
+    // Generate JWT token
+    return this.generateTokens(user.id);
   }
 
   /**

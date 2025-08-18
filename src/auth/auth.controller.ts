@@ -58,18 +58,26 @@ export class AuthController {
       idToken: { type: 'string', example: 'ya29.a0ARrdaM...' },
     },
   }})
-  @ApiResponse({ status: 200, description: 'Google 登入成功', type: GoogleLoginResponseDto })
+  @ApiResponse({ status: 201, description: 'Google 登入成功', type: GoogleLoginResponseDto })
   @Post('google-login')
   async googleLogin(@Body('idToken') idToken: string) {
     return this.authService.googleLogin(idToken);
   }
   
-  @ApiOperation({ summary: 'Facebook 登入，接收 accessToken' })
+  @ApiOperation({ summary: 'Facebook 登入(同時支援 web / Android / iOS) ' })
   @ApiResponse({
-    status: 200,
-    description: 'Facebook 登入成功',
+    status: 201,
+    description: 'Facebook 登入成功,回傳 accessToken 與 refreshToken',
     type: FacebookLoginResponseDto,
   })
+
+  //Facebook token 驗證失敗
+  @ApiResponse({
+    status: 401,
+    description: 'Facebook token 驗證失敗',
+    // type: FacebookLoginResponseDto,
+  })
+
   @ApiBody({ type: FacebookLoginRequestDto }) // 為 Facebook 登入請求體提供範例值
   @Post('facebook-login')
   async facebookLogin(@Body() body: FacebookLoginRequestDto) {
@@ -78,7 +86,7 @@ export class AuthController {
   
   @ApiOperation({ summary: 'Apple 登入，接收 id_token' })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Apple 登入成功',
     type: AppleLoginResponseDto,
   })
@@ -90,7 +98,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'WeChat 登入，接收授權 code' })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'WeChat 登入成功',
     type: WechatLoginResponseDto,
   })
