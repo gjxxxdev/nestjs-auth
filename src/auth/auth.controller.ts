@@ -81,7 +81,7 @@ export class AuthController {
   @ApiBody({ type: FacebookLoginRequestDto }) // 為 Facebook 登入請求體提供範例值
   @Post('facebook-login')
   async facebookLogin(@Body() body: FacebookLoginRequestDto) {
-    return this.authService.facebookLogin(body.accessToken);
+    return this.authService.facebookLogin(body.token);
   }
   
   @ApiOperation({ summary: 'Apple 登入，接收 id_token' })

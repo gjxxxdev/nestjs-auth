@@ -251,12 +251,12 @@ export class AuthService {
   }
 
   /**
-   * 處理 Facebook 登入，自動判斷是 Limited Login 還是標準 Access Token。
-   * @param accessToken Facebook 提供的存取令牌，可能是 Limited Login 的 user_token 或標準 access_token。
+   * 處理 Facebook 登入，自動判斷是 iOS Limited Login 的 id_token 還是 Web/Android 的標準 access_token。
+   * @param token Facebook 提供的令牌，可能是 id_token (JWT 格式) 或標準 access_token。
    * @returns 包含 accessToken 和 refreshToken 的登入成功回應。
    * @throws UnauthorizedException 如果 Facebook token 無效或無法獲取 email。
    */
-  async facebookLogin(accessToken: string) {
+  async facebookLogin(token: string) {
     // 從配置服務中獲取 Facebook 應用程式 ID 和密鑰
     // Get Facebook App ID and App Secret from config service
     const appId = this.configService.get('FACEBOOK_APP_ID');
@@ -265,32 +265,54 @@ export class AuthService {
     let facebookData;
 
     try {
-      // 嘗試作為 Limited Login token 進行交換
-      // Try to exchange as a Limited Login token
-      const limitedLoginExchangeUrl = `https://graph.facebook.com/oauth/access_token?grant_type=fb_limited_login&client_id=${appId}&client_secret=${appSecret}&access_token=${accessToken}`;
-      const exchangeRes = await axios.get(limitedLoginExchangeUrl);
-      const fullAccessToken = exchangeRes.data.access_token;
+      // 嘗試解析 token 是否為 JWT 格式 (id_token)
+      // Try to parse the token as JWT format (id_token)
+      const decodedHeader = jwt.decode(token, { complete: true }) as any;
 
-      // 使用交換後獲得的完整 access token 獲取用戶資料
-      // Use the obtained full access token to get user data
-      const graphApiUrl = `https://graph.facebook.com/me?fields=id,email,name&access_token=${fullAccessToken}`;
-      const { data } = await axios.get(graphApiUrl);
-      facebookData = data;
+      if (decodedHeader && decodedHeader.header.alg && decodedHeader.header.kid) {
+        // 如果是 JWT 格式，嘗試作為 Facebook id_token 進行驗證
+        // If it's JWT format, try to verify as Facebook id_token
+        const client = jwksClient({
+          jwksUri: 'https://www.facebook.com/.well-known/oauth/openid/jwks/',
+        });
 
-    } catch (limitedLoginError) {
-      // 如果 Limited Login 交換失敗，則嘗試作為一般 access token 處理
-      // If Limited Login exchange fails, try to process as a general access token
-      console.warn('Limited Login token exchange failed, trying as general access token:', limitedLoginError.message);
-      try {
-        const graphApiUrl = `https://graph.facebook.com/me?fields=id,email,name&access_token=${accessToken}`;
+        const key = await client.getSigningKey(decodedHeader.header.kid);
+        const signingKey = key.getPublicKey();
+
+        const payload = jwt.verify(token, signingKey, {
+          algorithms: ['RS256'],
+        }) as any;
+
+        // 驗證 iss 和 aud
+        // Verify iss and aud
+        const validIssuers = ['https://www.facebook.com', 'https://fid.facebook.com'];
+        if (!validIssuers.includes(payload.iss)) {
+          throw new UnauthorizedException('Facebook id_token 來源不合法');
+        }
+        if (payload.aud !== appId) {
+          throw new UnauthorizedException('Facebook App ID 不匹配');
+        }
+
+        facebookData = {
+          id: payload.user_id,
+          email: payload.email,
+          name: payload.name,
+        };
+        console.log('Facebook id_token 驗證成功');
+      } else {
+        // 如果不是 JWT 格式，或缺少 JWT 相關 header，則嘗試作為標準 access_token 處理
+        // If it's not JWT format, or lacks JWT headers, try to process as a standard access_token
+        console.warn('Token is not a valid JWT or missing JWT headers, trying as general access token.');
+        const graphApiUrl = `https://graph.facebook.com/me?fields=id,email,name&access_token=${token}`;
         const { data } = await axios.get(graphApiUrl);
         facebookData = data;
-      } catch (generalLoginError) {
-        // 如果兩種方式都失敗，則拋出錯誤
-        // If both methods fail, throw an error
-        console.error('Facebook token verification failed for both Limited and General Login:', generalLoginError.message);
-        throw new UnauthorizedException('Facebook token 驗證失敗');
+        console.log('Facebook general access token 驗證成功');
       }
+    } catch (error) {
+      // 捕獲所有驗證失敗的錯誤
+      // Catch all verification errors
+      console.error('Facebook token 驗證失敗:', error.message);
+      throw new UnauthorizedException('Facebook token 驗證失敗');
     }
 
     // 檢查是否成功獲取到 email
