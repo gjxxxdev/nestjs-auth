@@ -4,6 +4,7 @@ import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
+import { IapModule } from './iap/iap.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PrismaService } from './prisma.service';
     }),
     AuthModule,
     UsersModule,
+    IapModule
   ],
   providers: [PrismaService],
 })
