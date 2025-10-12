@@ -26,3 +26,7 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// coinBalance   Int            @default(0) // ✅ 金幣餘額
+// receipts      IapReceipt[]
+// coinLedger    CoinLedger[]
