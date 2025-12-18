@@ -30,3 +30,54 @@ model User {
 // coinBalance   Int            @default(0) // ✅ 金幣餘額
 // receipts      IapReceipt[]
 // coinLedger    CoinLedger[]
+
+model StoryLists {
+  id                    Int      @id @default(autoincrement())
+  lang                  String?  @db.VarChar(255)
+  order                 String?  @db.VarChar(255)
+  main_menu_name        String?  @db.VarChar(255)
+  main_menu_name_size   Int?
+  main_menu_name_weight String?  @db.VarChar(255)
+  main_menu_name_color  String?  @db.VarChar(255)
+  main_menu_image       String?  @db.VarChar(255)
+  main_menu_title       String?  @db.VarChar(255)
+  main_menu_content     String?  @db.Text
+  main_menu_btn_left    String?  @db.VarChar(255)
+  main_menu_btn_right   String?  @db.VarChar(255)
+  stroy_name            String?  @db.VarChar(255)
+  author                String?  @db.VarChar(255)
+  story_type            String?  @db.VarChar(255)
+  price                 String?  @db.VarChar(255)
+  chapter_type          String?  @db.VarChar(255)
+  open                  String?  @db.VarChar(255)
+  view_times            String?  @db.VarChar(255)
+  buy_times             String?  @db.VarChar(255)
+  createdAt             DateTime @db.DateTime
+  updatedAt             DateTime @db.DateTime
+
+  storeItem BookStoreItem?
+
+  @@map("StoryLists")
+}
+
+model BookStoreItem {
+  id Int @id @default(autoincrement())
+
+  // 🔗 關聯 StoryLists
+  storyListId Int        @unique
+  story       StoryLists @relation(fields: [storyListId], references: [id], onDelete: Cascade)
+
+  // 💰 商城資訊
+  priceCoins Int     @default(100)
+  currency   String  @default("COIN") @db.VarChar(20)
+  isActive   Boolean @default(true)
+
+  // 📊 統計
+  soldCount Int @default(0)
+
+  // ⏱️ 時間
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("book_store_items")
+}

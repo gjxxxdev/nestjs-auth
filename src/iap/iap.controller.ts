@@ -36,7 +36,6 @@ export class IapController {
   }
 
   @Post('webhook/google')
-  @HttpCode(HttpStatus.OK) // 設定回應狀態碼為 200
   // @ApiOperation({
   //   summary: 'Google IAP Webhook',
   //   description: `

@@ -5,9 +5,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
 import { IapModule } from './iap/iap.module';
+import { BookstoreModule } from './bookstore/bookstore.module';
 
 @Module({
   imports: [
+    BookstoreModule,
     ConfigModule.forRoot({ isGlobal: true }),
     JwtModule.register({
       global: true,
