@@ -12,9 +12,21 @@ export class BookstoreController {
   @Get('bookstorelist')
   @ApiOperation({ summary: '取得書本商店清單' })
   @ApiResponse({ status: 200, description: '成功取得書本商店清單（空陣列表示沒有商品）', type: () => BookstoreItemDto, isArray: true })
-  @ApiUnauthorizedResponse({ description: '未授權（401）', type: ErrorResponseDto })
-  @ApiForbiddenResponse({ description: '權限不足（403）', type: ErrorResponseDto })
-  @ApiInternalServerErrorResponse({ description: '伺服器錯誤（500），例如 DB 連線失敗', type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({
+    description: '未授權（401）',
+    type: ErrorResponseDto,
+    schema: { example: { success: false, message: '未授權' } },
+  })
+  @ApiForbiddenResponse({
+    description: '權限不足（403）',
+    type: ErrorResponseDto,
+    schema: { example: { success: false, message: '權限不足(403)' } },
+  })
+  @ApiInternalServerErrorResponse({
+    description: '伺服器錯誤（500），例如 DB 連線失敗',
+    type: ErrorResponseDto,
+    schema: { example: { success: false, message: '伺服器錯誤（500），例如 DB 連線失敗' } },
+  })
   async getBookStoreList() {
     return this.bookstoreService.getBookStoreList();
   }
