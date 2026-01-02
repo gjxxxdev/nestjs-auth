@@ -149,16 +149,37 @@ export class AuthService {
   }
 
   generateTokens(userId: number) {
-    const accessToken = this.jwtService.sign(
-      { userId },
-      { secret: this.configService.get('JWT_SECRET'), expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
-    );
-    const refreshToken = this.jwtService.sign(
-      { userId },
-      { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') }
-    );
-    return { success: true, accessToken, refreshToken, };
+    const payload = { sub: userId }; // ⭐ 關鍵：一定要用 sub
+
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
+    });
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken,
+    };
   }
+
+  //old
+  // generateTokens(userId: number) {
+  //   const accessToken = this.jwtService.sign(
+  //     { userId },
+  //     { secret: this.configService.get('JWT_SECRET'), expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
+  //   );
+  //   const refreshToken = this.jwtService.sign(
+  //     { userId },
+  //     { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') }
+  //   );
+  //   return { success: true, accessToken, refreshToken, };
+  // }
 
   // 註冊流程 - 建立帳號並寄送驗證信
 

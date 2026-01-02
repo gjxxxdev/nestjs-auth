@@ -7,8 +7,8 @@ export class IapResponseDto {
   @ApiProperty({ example: 'GOOGLE' })
   platform: 'GOOGLE' | 'APPLE';
 
-  @ApiProperty({ example: 'user-123' })
-  userId: string;
+  @ApiProperty({ example: '123 或 system', description: '使用者 ID (數字) 或系統標識 (字串)' })
+  userId: number | string;
 
   @ApiProperty({ example: 100 })
   coinsAdded: number;

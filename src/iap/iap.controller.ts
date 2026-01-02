@@ -1,9 +1,11 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, Req, UseGuards } from '@nestjs/common'; // 導入 UseGuards
+import { Body, Controller, Post, HttpCode, HttpStatus, Req, UseGuards, UnauthorizedException } from '@nestjs/common'; // 導入 UseGuards, UnauthorizedException
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { IapService } from './iap.service';
 import { IapResponseDto } from './dto/iap-response.dto';
 import { VerifyReceiptRequestDto } from './dto/verify-receipt-request.dto'; // 導入 VerifyReceiptRequestDto
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard'; // 導入 OptionalJwtAuthGuard
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 
 @ApiTags('IAP')
@@ -12,27 +14,29 @@ export class IapController {
   constructor(private readonly iapService: IapService) {}
 
   @Post('verify')
-  @UseGuards(OptionalJwtAuthGuard) // 添加 OptionalJwtAuthGuard
-  @HttpCode(HttpStatus.OK) // ← 改成 200，而不是 201
+  @UseGuards(JwtAuthGuard) // ✅ 一定要登入
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: '驗證收據',
     description: `
       驗證 Google / Apple 收據是否有效並入金。
 
       ⚠️ 注意：
-      - 若 IAP_USE_MOCK=true → 回傳固定測試結果，不會驗證收據
-      - 若 IAP_USE_MOCK=false → 串接 Google / Apple 正式驗證 API
+      - IAP_USE_MOCK=true → 回傳 mock 並實際入金
+      - IAP_USE_MOCK=false → 串接 Google / Apple 正式驗證 API
     `,
   })
   @ApiResponse({ status: 200, type: IapResponseDto, description: '驗證成功' })
-  @ApiResponse({ status: 401, description: '驗證失敗，收據無效' })
+  @ApiResponse({ status: 401, description: '未登入或使用者無效' })
   async verifyReceipt(
-    @Body() body: VerifyReceiptRequestDto, // 使用 DTO 處理請求體
-    @Req() req,
+    @Body() body: VerifyReceiptRequestDto,
+    @CurrentUser() user,
   ): Promise<IapResponseDto> {
-  const { platform, receipt } = body; // 從 DTO 中提取參數
-  const userId = req.user.id;
-  return this.iapService.verifyReceipt(platform, receipt, userId);
+    return this.iapService.verifyReceipt(
+      body.platform,
+      body.receipt,
+      user.id, // ⭐ 這裡一定有值
+    );
   }
 
   @Post('webhook/google')

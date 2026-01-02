@@ -10,6 +10,4 @@ export class VerifyReceiptRequestDto {
   })
   receipt: string;
 
-  @ApiProperty({ example: 'user_123', description: '用戶 ID' })
-  userId: string;
 }

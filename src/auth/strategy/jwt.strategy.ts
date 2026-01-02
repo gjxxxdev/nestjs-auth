@@ -15,6 +15,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    return { userId: payload.userId };
+    // return { userId: payload.userId };
+    return {
+    userId: payload.sub, // ⭐ 對應 generateTokens 的 sub
+    };
   }
 }

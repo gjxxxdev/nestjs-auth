@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
 import { IapModule } from './iap/iap.module';
 import { BookstoreModule } from './bookstore/bookstore.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { BookstoreModule } from './bookstore/bookstore.module';
     }),
     AuthModule,
     UsersModule,
-    IapModule
+    IapModule,
+    OrdersModule
   ],
   providers: [PrismaService],
 })

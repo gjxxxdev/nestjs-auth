@@ -81,3 +81,14 @@ model BookStoreItem {
 
   @@map("book_store_items")
 }
+
+model CoinLedger {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  changeAmount Int      @map("change_amount")
+  balance      Int
+  type         String   @db.VarChar(30)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("coin_ledger")
+}
