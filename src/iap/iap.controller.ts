@@ -32,11 +32,13 @@ export class IapController {
     @Body() body: VerifyReceiptRequestDto,
     @CurrentUser() user,
   ): Promise<IapResponseDto> {
+    console.log('CurrentUser =', user);
     return this.iapService.verifyReceipt(
       body.platform,
       body.receipt,
-      user.id, // ⭐ 這裡一定有值
+      user.userId, // ⭐ 這裡一定有值
     );
+    
   }
 
   @Post('webhook/google')
