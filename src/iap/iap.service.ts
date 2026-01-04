@@ -8,13 +8,13 @@ import { PrismaService } from '../prisma.service';
 @Injectable()
 export class IapService {
   private readonly logger = new Logger(IapService.name);
-  private readonly isProd: boolean;
+  // private readonly isProd: boolean;
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.isProd = this.configService.get('NODE_ENV') === 'production';
+    // this.isProd = this.configService.get('NODE_ENV') === 'production';
   }
 
   async verifyReceipt(
@@ -22,7 +22,13 @@ export class IapService {
     receipt: string,
     userId: number,
   ): Promise<IapResponseDto> {
-    if (!this.isProd) {
+    if (!userId || userId <= 0) {
+      throw new UnauthorizedException('無效的使用者 ID');
+    }
+
+    const useMock = this.configService.get('IAP_USE_MOCK') === 'true';
+
+    if (useMock) {
       // 🟢 開發模式：直接回 mock 結果
       this.logger.warn(`[MOCK] Verify receipt for ${platform}`);
 

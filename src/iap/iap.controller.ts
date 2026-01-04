@@ -1,5 +1,5 @@
 import { Body, Controller, Post, HttpCode, HttpStatus, Req, UseGuards, UnauthorizedException } from '@nestjs/common'; // 導入 UseGuards, UnauthorizedException
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { IapService } from './iap.service';
 import { IapResponseDto } from './dto/iap-response.dto';
 import { VerifyReceiptRequestDto } from './dto/verify-receipt-request.dto'; // 導入 VerifyReceiptRequestDto
@@ -9,6 +9,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 
 @ApiTags('IAP')
+@ApiBearerAuth()
 @Controller('iap')
 export class IapController {
   constructor(private readonly iapService: IapService) {}
@@ -36,9 +37,9 @@ export class IapController {
     return this.iapService.verifyReceipt(
       body.platform,
       body.receipt,
-      user.userId, // ⭐ 這裡一定有值
+      user.userId,
     );
-    
+
   }
 
   @Post('webhook/google')

@@ -12,8 +12,8 @@ export async function addCoinLedger(params: {
 }) {
   const { userId, changeAmount, type } = params;
 
-  if (typeof userId !== 'number') {
-    throw new Error(`coin-ledger.helper: invalid userId ${userId}`);
+  if (!userId || userId <= 0) {
+    throw new Error(`Invalid userId: ${userId}`);
   }
 
   // ✅ 查最後一筆 balance（使用實際 DB 欄位 user_id）

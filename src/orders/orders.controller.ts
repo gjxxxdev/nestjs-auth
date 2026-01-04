@@ -27,7 +27,7 @@ export class OrdersController {
     @Body() dto: CoinPurchaseDto,
   ) {
     return this.ordersService.coinPurchase(
-      req.user.id,
+      req.user.userId,
       dto.storyListId,
       dto.idempotencyKey,
     );

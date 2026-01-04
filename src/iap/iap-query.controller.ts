@@ -13,18 +13,18 @@ export class IapQueryController {
   @Get('me/iap-receipts')
   @ApiOperation({ summary: '查詢我的 IAP 儲值紀錄' })
   getMyIapReceipts(@Req() req) {
-    return this.iapQueryService.getMyIapReceipts(req.user.id);
+    return this.iapQueryService.getMyIapReceipts(req.user.userId);
   }
 
   @Get('me/coins/balance')
   @ApiOperation({ summary: '查詢我的金幣餘額' })
   getMyCoinBalance(@Req() req) {
-    return this.iapQueryService.getMyCoinBalance(req.user.id);
+    return this.iapQueryService.getMyCoinBalance(req.user.userId);
   }
 
   @Get('me/coins/ledger')
   @ApiOperation({ summary: '查詢我的金幣流水' })
   getMyCoinLedger(@Req() req) {
-    return this.iapQueryService.getMyCoinLedger(req.user.id);
+    return this.iapQueryService.getMyCoinLedger(req.user.userId);
   }
 }
