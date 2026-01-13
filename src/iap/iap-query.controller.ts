@@ -1,7 +1,9 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IapQueryService } from './iap-query.service';
+import { MyIapReceiptDto } from './dto/my-iap-receipt.dto';
+import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
 
 @ApiTags('IAP / Coins')
 @ApiBearerAuth()
@@ -12,7 +14,12 @@ export class IapQueryController {
 
   @Get('me/iap-receipts')
   @ApiOperation({ summary: '查詢我的 IAP 儲值紀錄' })
-  getMyIapReceipts(@Req() req) {
+  @ApiResponse({
+    status: 200,
+    description: '成功獲取 IAP 儲值紀錄',
+    type: MyIapReceiptsResponseDto,
+  })
+  getMyIapReceipts(@Req() req): Promise<MyIapReceiptsResponseDto> {
     return this.iapQueryService.getMyIapReceipts(req.user.userId);
   }
 

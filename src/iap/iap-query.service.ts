@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
 
 @Injectable()
 export class IapQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
   // 1️⃣ 我的 IAP 儲值紀錄
-  async getMyIapReceipts(userId: number) {
+  async getMyIapReceipts(userId: number): Promise<MyIapReceiptsResponseDto> {
     const rows = await this.prisma.$queryRaw<any[]>`
       SELECT
+        transaction_id,
         platform,
         product_id,
         coins,
@@ -21,6 +23,7 @@ export class IapQueryService {
 
     return {
       items: rows.map(r => ({
+        receiptId: r.transaction_id,
         platform: r.platform,
         productId: r.product_id,
         coins: r.coins,
