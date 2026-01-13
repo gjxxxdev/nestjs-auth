@@ -3,7 +3,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
- * 金幣帳本 helper（直接對應既有 DB 結構）
+ * 金幣帳本 helper（正式建議版）
+ * - 使用 Raw SQL，完全對齊既有 DB
+ * - 使用 transaction，避免併發問題
  */
 export async function addCoinLedger(params: {
   userId: number;
@@ -16,34 +18,36 @@ export async function addCoinLedger(params: {
     throw new Error(`Invalid userId: ${userId}`);
   }
 
-  // ✅ 查最後一筆 balance（使用實際 DB 欄位 user_id）
-  const last = await prisma.$queryRaw<
-    Array<{ balance: number }>
-  >`
-    SELECT balance
-    FROM coin_ledger
-    WHERE user_id = ${userId}
-    ORDER BY id DESC
-    LIMIT 1
-  `;
+  return prisma.$transaction(async (tx) => {
+    // 1️⃣ 取得最後一筆 balance
+    const last = await tx.$queryRaw<
+      Array<{ balance: number }>
+    >`
+      SELECT balance
+      FROM coin_ledger
+      WHERE user_id = ${userId}
+      ORDER BY id DESC
+      LIMIT 1
+    `;
 
-  const prevBalance = last.length > 0 ? last[0].balance : 0;
-  const newBalance = prevBalance + changeAmount;
+    const prevBalance = last.length > 0 ? last[0].balance : 0;
+    const newBalance = prevBalance + changeAmount;
 
-  if (newBalance < 0) {
-    throw new Error('金幣不足');
-  }
+    if (newBalance < 0) {
+      throw new Error('金幣不足');
+    }
 
-  // ✅ 寫入 ledger
-  await prisma.$executeRaw`
-    INSERT INTO coin_ledger (user_id, change_amount, balance, type)
-    VALUES (${userId}, ${changeAmount}, ${newBalance}, ${type})
-  `;
+    // 2️⃣ 寫入帳本
+    await tx.$executeRaw`
+      INSERT INTO coin_ledger (user_id, change_amount, balance, type)
+      VALUES (${userId}, ${changeAmount}, ${newBalance}, ${type})
+    `;
 
-  return {
-    userId,
-    changeAmount,
-    balance: newBalance,
-    type,
-  };
+    return {
+      userId,
+      changeAmount,
+      balance: newBalance,
+      type,
+    };
+  });
 }

@@ -2,15 +2,20 @@ import { addCoinLedger } from './coin-ledger.helper';
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { IapResponseDto } from './dto/iap-response.dto';
-import { handleIapSuccess } from './iap-ledger.helper';
+import { IapResponseDto } from './dto/iap-response.dto'; // ✅ 確保有 import
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class IapService {
   private readonly logger = new Logger(IapService.name);
+  // private readonly isProd: boolean;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {
+    // this.isProd = this.configService.get('NODE_ENV') === 'production';
+  }
 
   async verifyReceipt(
     platform: 'GOOGLE' | 'APPLE',
@@ -23,21 +28,15 @@ export class IapService {
 
     const useMock = this.configService.get('IAP_USE_MOCK') === 'true';
 
-    /**
-     * 🟢 MOCK MODE（開發 / 測試）
-     * - 不驗證收據
-     * - 但「一樣寫入 iap_receipts + coin_ledger」
-     */
     if (useMock) {
+      // 🟢 開發模式：直接回 mock 結果
       this.logger.warn(`[MOCK] Verify receipt for ${platform}`);
 
-      const result = await handleIapSuccess({
+      // ✅ 真正寫入 coin_ledger（重點）
+      await addCoinLedger({
         userId,
-        platform,
-        productId: 'coin_pack_100',
-        transactionId: `MOCK-${Date.now()}`, // ⚠️ 一定要唯一
-        coins: 100,
-        rawResponse: { mock: true, receipt },
+        changeAmount: 100,
+        type: 'IAP',
       });
 
       return {
@@ -45,60 +44,39 @@ export class IapService {
         platform,
         userId,
         coinsAdded: 100,
-        message: 'Mock IAP success',
-        raw: result,
+        message: '收據驗證成功，入金 100 金幣 (mock)',
+        raw: { mock: true},
       };
     }
 
-    /**
-     * 🔵 正式模式
-     */
     if (platform === 'GOOGLE') {
       return this.verifyGoogle(receipt, userId);
-    }
-
-    if (platform === 'APPLE') {
+    } else if (platform === 'APPLE') {
       return this.verifyApple(receipt, userId);
+    } else {
+      throw new UnauthorizedException('Unsupported platform');
     }
-
-    throw new UnauthorizedException('Unsupported platform');
   }
 
-  /**
-   * 🔵 Google IAP
-   */
-  private async verifyGoogle(
-    receipt: string,
-    userId: number,
-  ): Promise<IapResponseDto> {
+  private async verifyGoogle(receipt: string, userId: number): Promise<IapResponseDto> {
     try {
       const serviceAccount = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_KEY');
       const packageName = this.configService.get<string>('GOOGLE_PACKAGE_NAME');
-
-      const productId = 'coin_pack_100'; // TODO: 由 receipt 解析
-      const transactionId = receipt;     // ⚠️ 真實情況要用 Google 回傳的 orderId
+      const productId = 'coin_pack_100'; // TODO: 根據 receipt 解析 productId
+      const token = receipt;
 
       const response = await axios.get(
-        `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/products/${productId}/tokens/${receipt}`,
+        `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/products/${productId}/tokens/${token}`,
         { headers: { Authorization: `Bearer ${serviceAccount}` } },
       );
-
-      const result = await handleIapSuccess({
-        userId,
-        platform: 'GOOGLE',
-        productId,
-        transactionId,
-        coins: 100,
-        rawResponse: response.data,
-      });
 
       return {
         success: true,
         platform: 'GOOGLE',
         userId,
         coinsAdded: 100,
-        message: 'Google receipt verified',
-        raw: result,
+        message: 'Google receipt verified successfully',
+        raw: response.data,
       };
     } catch (error) {
       this.logger.error(`Google verify failed: ${error.message}`);
@@ -106,47 +84,25 @@ export class IapService {
     }
   }
 
-  /**
-   * 🔵 Apple IAP
-   */
-  private async verifyApple(
-    receipt: string,
-    userId: number,
-  ): Promise<IapResponseDto> {
+  private async verifyApple(receipt: string, userId: number): Promise<IapResponseDto> {
     try {
       const sharedSecret = this.configService.get<string>('APPLE_SHARED_SECRET');
-
-      const response = await axios.post(
-        'https://buy.itunes.apple.com/verifyReceipt',
-        {
-          'receipt-data': receipt,
-          password: sharedSecret,
-        },
-      );
+      const response = await axios.post('https://buy.itunes.apple.com/verifyReceipt', {
+        'receipt-data': receipt,
+        password: sharedSecret,
+      });
 
       if (response.data.status !== 0) {
         throw new UnauthorizedException('Apple receipt invalid');
       }
-
-      const productId = response.data.receipt?.product_id ?? 'coin_pack_100';
-      const transactionId = response.data.receipt?.transaction_id;
-
-      const result = await handleIapSuccess({
-        userId,
-        platform: 'APPLE',
-        productId,
-        transactionId,
-        coins: 100,
-        rawResponse: response.data,
-      });
 
       return {
         success: true,
         platform: 'APPLE',
         userId,
         coinsAdded: 100,
-        message: 'Apple receipt verified',
-        raw: result,
+        message: 'Apple receipt verified successfully',
+        raw: response.data,
       };
     } catch (error) {
       this.logger.error(`Apple verify failed: ${error.message}`);
@@ -154,7 +110,7 @@ export class IapService {
     }
   }
 
-// ✅ Google Webhook
+  // ✅ Google Webhook
   /**
    * 處理 Google Webhook 通知。
    * @param body Webhook 請求的內容。

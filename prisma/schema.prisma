@@ -92,3 +92,17 @@ model CoinLedger {
 
   @@map("coin_ledger")
 }
+
+model IapReceipt {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  platform      String
+  productId     String   @map("product_id")
+  transactionId String   @unique @map("transaction_id")
+  coins         Int
+  status        String
+  rawResponse   Json?    @map("raw_response")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("iap_receipts")
+}
