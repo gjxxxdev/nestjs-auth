@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-// 我的 IAP 儲值紀錄 DTO
+// 我的 IAP 儲值紀錄 DTO (單筆)
 export class MyIapReceiptDto {
   // 收據 ID，對應 transaction_id
   @ApiProperty({
-    description: '收據 ID，對應 transaction_id',
+    description: '收據 ID (Transaction ID)',
     example: 'GPA.1234-5678-9012-34567',
   })
   receiptId: string;
@@ -19,21 +19,35 @@ export class MyIapReceiptDto {
 
   // 商品 ID
   @ApiProperty({
-    description: '商品 ID',
+    description: '商品 ID (Product ID)',
     example: 'coin_pack_100',
   })
   productId: string;
 
-  // 金幣數量
+  // 🟢 [修改] 總金幣數量 (改名為 totalCoins 以示區別)
   @ApiProperty({
-    description: '金幣數量',
-    example: 100,
+    description: '總獲得金幣 (基礎 + Bonus)',
+    example: 95,
   })
-  coins: number;
+  totalCoins: number;
+
+  // 🟢 [新增] 基礎金幣 (實際購買量)
+  @ApiProperty({
+    description: '基礎金幣 (Base)',
+    example: 90,
+  })
+  baseCoins: number;
+
+  // 🟢 [新增] 獎勵金幣 (Bonus)
+  @ApiProperty({
+    description: '獎勵金幣 (Bonus)',
+    example: 5,
+  })
+  bonusCoins: number;
 
   // 狀態
   @ApiProperty({
-    description: '狀態',
+    description: '交易狀態',
     example: 'SUCCESS',
   })
   status: string;

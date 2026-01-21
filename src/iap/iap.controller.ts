@@ -1,80 +1,65 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, Req, UseGuards, UnauthorizedException } from '@nestjs/common'; // 導入 UseGuards, UnauthorizedException
+import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Logger } from '@nestjs/common'; // 🟢 修正 mport -> import
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { IapService } from './iap.service';
 import { IapResponseDto } from './dto/iap-response.dto';
-import { VerifyReceiptRequestDto } from './dto/verify-receipt-request.dto'; // 導入 VerifyReceiptRequestDto
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard'; // 導入 OptionalJwtAuthGuard
+import { VerifyReceiptRequestDto } from './dto/verify-receipt-request.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-
 
 @ApiTags('IAP')
 @ApiBearerAuth()
 @Controller('iap')
 export class IapController {
+  private readonly logger = new Logger(IapController.name);
+
   constructor(private readonly iapService: IapService) {}
 
   @Post('verify')
-  @UseGuards(JwtAuthGuard) // ✅ 一定要登入
+  @UseGuards(JwtAuthGuard) // ✅ 強制登入驗證
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: '驗證收據',
+    summary: '驗證 Google/Apple 收據並入金',
     description: `
-      驗證 Google / Apple 收據是否有效並入金。
-
-      ⚠️ 注意：
-      - IAP_USE_MOCK=true → 回傳 mock 並實際入金
-      - IAP_USE_MOCK=false → 串接 Google / Apple 正式驗證 API
+      前端完成內購後，將 platform, receipt 與 productId 傳送到此 API。
+      後端會根據 productId 查詢對應的金幣數量 (含 Bonus) 並寫入帳本。
+      
+      - Google Play: receipt 欄位請傳入 purchaseToken。
+      - Apple App Store: receipt 欄位請傳入 base64 編碼的收據。
     `,
   })
-  @ApiResponse({ status: 200, type: IapResponseDto, description: '驗證成功' })
-  @ApiResponse({ status: 401, description: '未登入或使用者無效' })
+  @ApiResponse({ status: 200, type: IapResponseDto, description: '驗證成功並已入金' })
+  @ApiResponse({ status: 400, description: '參數格式錯誤 (productId 缺失或平台不支援)' })
+  @ApiResponse({ status: 401, description: '憑證無效或收據驗證失敗' })
   async verifyReceipt(
     @Body() body: VerifyReceiptRequestDto,
     @CurrentUser() user,
   ): Promise<IapResponseDto> {
-    console.log('CurrentUser =', user);
+    this.logger.log(`[Verify] User: ${user.userId}, Platform: ${body.platform}, Product: ${body.productId}`);
+
+    // 呼叫 Service 執行第三方驗證與資料庫交易
     return this.iapService.verifyReceipt(
       body.platform,
       body.receipt,
       user.userId,
+      body.productId,
     );
-
   }
 
   @Post('webhook/google')
-  // @ApiOperation({
-  //   summary: 'Google IAP Webhook',
-  //   description: `
-  //     Google Play Server Notification → 通知退款/撤銷/入金等事件。
-
-  //     ⚠️ 注意：
-  //     - dev 模式 (IAP_USE_MOCK=true) → 只記錄 log
-  //     - prod 模式 (IAP_USE_MOCK=false) → TODO: 驗證並更新 coin_ledger / iap_receipts
-  //   `,
-  // })
-  @ApiOperation({ summary: 'Google IAP Webhook' })
-  @ApiResponse({ status: 200, type: IapResponseDto, description: 'Google webhook 已接收' })
-  @ApiResponse({ status: 401, description: 'Webhook 驗證失敗，未授權' })
+  @ApiOperation({ summary: '接收 Google Play Server Notifications' })
+  @ApiResponse({ status: 200, description: 'Webhook 處理完成' })
   async handleGoogleWebhook(@Body() body: any): Promise<IapResponseDto> {
-    return this.iapService.handleGoogleWebhook(body);
+    this.logger.log('收到 Google Webhook');
+    // 注意：Webhook 呼叫通常不帶登入資訊，userId 傳 'system'
+    return this.iapService.handleGoogleWebhook(body, 'system');
   }
 
   @Post('webhook/apple')
-  // @ApiOperation({
-  //   summary: 'Apple IAP Webhook',
-  //   description: `
-  //     Apple Server Notification → 通知退款/撤銷/入金等事件。
-
-  //     ⚠️ 注意：
-  //     - dev 模式 (IAP_USE_MOCK=true) → 只記錄 log
-  //     - prod 模式 (IAP_USE_MOCK=false) → TODO: 驗證並更新 coin_ledger / iap_receipts
-  //   `,
-  // })
-  @ApiOperation({ summary: 'Apple IAP Webhook' })
-  @ApiResponse({ status: 200, type: IapResponseDto, description: 'Apple webhook 已接收' })
-  @ApiResponse({ status: 401, description: 'Webhook 驗證失敗，未授權' })
+  @ApiOperation({ summary: '接收 Apple App Store Server Notifications' })
+  @ApiResponse({ status: 200, description: 'Webhook 處理完成' })
   async handleAppleWebhook(@Body() body: any): Promise<IapResponseDto> {
-    return this.iapService.handleAppleWebhook(body);
+    this.logger.log('收到 Apple Webhook');
+    // 同上，userId 傳 'system'
+    return this.iapService.handleAppleWebhook(body, 'system');
   }
 }

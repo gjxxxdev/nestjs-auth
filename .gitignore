@@ -9,3 +9,7 @@ node_modules
 npm-debug.log
 EOF
 /src/main.ts
+*copy.ts
+*copy.prisma
+*backup.ts
+config/xstory-*.json

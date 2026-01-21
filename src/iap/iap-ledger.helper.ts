@@ -7,65 +7,97 @@ export async function handleIapSuccess(params: {
   platform: 'GOOGLE' | 'APPLE';
   productId: string;
   transactionId: string;
-  coins: number;
+  amount: number;       // 基礎金幣
+  bonusAmount: number;  // 獎勵金幣
   rawResponse?: any;
 }) {
-  const { userId, platform, productId, transactionId, coins, rawResponse } = params;
+  const { userId, platform, productId, transactionId, amount, bonusAmount, rawResponse } = params;
+  const totalCoins = amount + bonusAmount;
 
   if (!userId || userId <= 0) {
     throw new Error('Invalid userId');
   }
 
+  // 使用 Prisma Transaction 確保原子性：要麼全部成功，要麼全部失敗
   return prisma.$transaction(async (tx) => {
-    /** 1️⃣ 防止重複入金（transaction_id 唯一） */
-    const exists = await tx.$queryRaw<
-      Array<{ id: number }>
-    >`
-      SELECT id
-      FROM iap_receipts
-      WHERE transaction_id = ${transactionId}
-      LIMIT 1
-    `;
+    
+    /** 1️⃣ 防重放檢查 (Idempotency Check) */
+    // 利用資料庫的唯一索引 (platform + transactionId) 來防止重複入金
+    const existingReceipt = await tx.iapReceipt.findUnique({
+      where: {
+        platform_transactionId: { platform, transactionId },
+      },
+    });
 
-    if (exists.length > 0) {
+    if (existingReceipt) {
+      console.warn(`[IAP Helper] 偵測到重複交易: ${transactionId}，已攔截。`);
       return {
         duplicated: true,
         message: 'Receipt already processed',
+        transactionId,
       };
     }
 
-    /** 2️⃣ 寫入 iap_receipts */
-    await tx.$executeRaw`
-      INSERT INTO iap_receipts
-        (user_id, platform, product_id, transaction_id, coins, status, raw_response)
-      VALUES
-        (${userId}, ${platform}, ${productId}, ${transactionId}, ${coins}, 'SUCCESS', ${JSON.stringify(rawResponse)})
-    `;
+    /** 2️⃣ 記錄詳細收據 (IapReceipt) */
+    // 這張表是你的「原始憑證」，絕對不能出錯
+    const savedReceipt = await tx.iapReceipt.create({
+      data: {
+        userId,
+        platform,
+        productId,
+        transactionId,
+        coins: totalCoins,
+        status: 'SUCCESS',
+        rawResponse: rawResponse || {},
+      },
+    });
 
-    /** 3️⃣ 寫入 coin_ledger（沿用你的邏輯） */
-    const last = await tx.$queryRaw<
-      Array<{ balance: number }>
-    >`
-      SELECT balance
-      FROM coin_ledger
-      WHERE user_id = ${userId}
-      ORDER BY id DESC
-      LIMIT 1
-    `;
+    /** 3️⃣ 更新帳本 (CoinLedger) - 拆帳記錄 */
+    // 先取得該使用者目前的最後一筆餘額
+    const lastLedger = await tx.coinLedger.findFirst({
+      where: { userId },
+      orderBy: { id: 'desc' },
+    });
 
-    const prevBalance = last.length > 0 ? last[0].balance : 0;
-    const newBalance = prevBalance + coins;
+    let currentBalance = lastLedger ? lastLedger.balance : 0;
 
-    await tx.$executeRaw`
-      INSERT INTO coin_ledger (user_id, change_amount, balance, type)
-      VALUES (${userId}, ${coins}, ${newBalance}, 'IAP')
-    `;
+    // A. 基礎金幣入帳
+    currentBalance += amount;
+    await tx.coinLedger.create({
+      data: {
+        userId,
+        changeAmount: amount,
+        balance: currentBalance,
+        type: 'IAP', // 類型標記為正式內購
+        source: `ORDER:${transactionId}|PROD:${productId}`, // 記錄來源方便對帳
+      },
+    });
+
+    // B. 獎勵金幣入帳 (如果有贈送才寫入)
+    if (bonusAmount > 0) {
+      currentBalance += bonusAmount;
+      await tx.coinLedger.create({
+        data: {
+          userId,
+          changeAmount: bonusAmount,
+          balance: currentBalance,
+          type: 'IAP_BONUS', // 類型標記為獎勵金幣
+          source: `ORDER:${transactionId}|PROD:${productId}_BONUS`,
+        },
+      });
+    }
+
+    console.log(`[IAP Success] User: ${userId} 儲值成功。總計: ${totalCoins} (含 Bonus: ${bonusAmount})。`);
 
     return {
       success: true,
       userId,
-      coinsAdded: coins,
-      balance: newBalance,
+      receiptId: savedReceipt.id,
+      coinsAdded: totalCoins,
+      balance: currentBalance,
     };
+  }, {
+    // 設定超時時間，避免大型交易卡住資料庫 (預設 5s)
+    timeout: 10000, 
   });
 }
