@@ -20,26 +20,35 @@ export class CoinPacksController {
     type: GetCoinPacksResponseDto,
   })
   async findAll(@Query() query: GetCoinPacksRequestDto): Promise<GetCoinPacksResponseDto> {
-    // 1. 從 Service 取得原始資料 (Prisma 模型)
+    // 🟢 修正 1：加上 await 等待資料庫查詢完成
+    // 如果不加 await，這裡拿到的 rawPacks 就會是 Promise，導致後面報錯
     const rawPacks = await this.coinPacksService.findAll(query.platform);
     
     // 2. 資料轉換 (Mapping)
-    // 將 Prisma 的資料結構轉換為前端需要的 DTO 結構
     const formattedPacks = rawPacks.map(pack => ({
       id: pack.id,
-      platform: pack.platform,
-      productId: pack.productId,     // 對應 DTO 新增欄位
+      
+      // 🟢 修正 2：加上型別斷言 (Type Assertion)
+      // 資料庫回傳的是 string，但 DTO 嚴格要求 'GOOGLE' | 'APPLE'
+      platform: pack.platform as 'GOOGLE' | 'APPLE',
+      
+      productId: pack.productId,
       name: pack.name,
-      amount: pack.amount,           // 對應 DTO 新增欄位
-      bonusAmount: pack.bonusAmount, // 對應 DTO 新增欄位
-      price: Number(pack.price),     // 🟢 關鍵：將 Decimal 轉為 number
-      currency: pack.currency,       // 對應 DTO 新增欄位
-      isActive: pack.isActive,       // 對應 DTO 新增欄位
-      sortOrder: pack.sortOrder,     // 對應 DTO 新增欄位
+      amount: pack.amount,
+      bonusAmount: pack.bonusAmount,
+      
+      // 🟢 修正 3：將 Decimal 轉為 JavaScript Number
+      // 這是因為 DTO 定義 price 為 number，但 Prisma 回傳 Decimal 物件
+      price: Number(pack.price),
+      
+      currency: pack.currency,
+      isActive: pack.isActive,
+      sortOrder: pack.sortOrder,
       createdAt: pack.createdAt,
       updatedAt: pack.updatedAt,
     }));
 
+    // 3. 回傳轉換後的陣列
     return { 
       success: true, 
       data: formattedPacks 
