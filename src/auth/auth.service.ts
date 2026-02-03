@@ -466,11 +466,11 @@ export class AuthService {
     let user = await this.usersService.findByEmail(payload.email);
     if (!user) {
       // 如果使用者不存在，則創建新使用者
-      user = await this.usersService.create({
+      user = await this.usersService.createSocialUser({
         email: payload.email,
-        password: '', // 社交登入通常不需要密碼
-        provider: 'google', // 設定提供者為 Google
-        name: payload.name, // 使用 Google 提供的名稱
+        provider: 'google',
+        providerId: payload.sub, // 使用 Google 提供的唯一識別碼
+        name: payload.name,
       });
     }
 
