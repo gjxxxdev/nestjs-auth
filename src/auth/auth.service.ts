@@ -554,11 +554,11 @@ export class AuthService {
     // Find or create user by email
     let user = await this.usersService.findByEmail(facebookData.email);
     if (!user) {
-      user = await this.usersService.create({
+      user = await this.usersService.createSocialUser({
         email: facebookData.email,
-        password: '',
         provider: 'facebook',
-        name: facebookData.name, // Limited Login 可能沒有 name，需要處理
+        providerId: facebookData.id, // 使用 Facebook 提供的唯一識別碼
+        name: facebookData.name,
       });
     }
 
@@ -656,10 +656,10 @@ export class AuthService {
   
       let user = await this.usersService.findByEmail(email);
       if (!user) {
-        user = await this.usersService.create({
+        user = await this.usersService.createSocialUser({
           email,
-          password: '',
           provider: 'wechat',
+          providerId: identifier, // 使用 WeChat 提供的唯一識別碼
           name: '',
         });
       }
