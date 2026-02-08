@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { v4 as uuidv4 } from 'uuid'; // 導入 uuidv4
 import { MailService } from '../mail/mail.service'; // 導入 MailService
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,22 @@ export class AuthService {
     private readonly redis: Redis, // 來自 ioredis 套件注入
     private readonly mailService: MailService, // 注入 MailService
   ) {
+    // 檢查必要的環境變數
+    const requiredEnvVars = [
+      'JWT_SECRET',
+      'JWT_REFRESH_SECRET',
+      'JWT_ACCESS_EXPIRES_IN',
+      'JWT_REFRESH_EXPIRES_IN',
+      'REDIS_HOST',
+      'REDIS_PORT'
+    ];
+
+    for (const envVar of requiredEnvVars) {
+      if (!this.configService.get(envVar)) {
+        console.warn(`警告：環境變數 ${envVar} 未設置`);
+      }
+    }
+
     // 初始化 Google OAuth2 客戶端，支援多個平台
     this.googleClientIds = [
       this.configService.get('GOOGLE_WEB_CLIENT_ID'),
@@ -113,52 +130,264 @@ export class AuthService {
     return { success: true, message: '驗證信已重新發送' };
   }
 
-  private getRefreshKey(token: string) {
-    return `bl:refresh:${token}`;
+  private getAccessTokenKey(accessToken: string): string {
+    const payload = this.jwtService.decode(accessToken) as any;
+    if (payload.jti) {
+      return `bl:access:${payload.jti}`;
+    }
+    return `bl:access:${payload.sub}:${payload.iat}`;
   }
 
-  async logout(refreshToken: string) {
-    const key = this.getRefreshKey(refreshToken);
-    const ttl = this.configService.get('JWT_REFRESH_EXPIRES_IN') || '30d';
-    const expiresInSec = 60 * 60 * 24 * 30;
-    await this.redis.set(key, 'blacklisted', 'EX', expiresInSec);
+  private getRefreshKey(refreshToken: string): string {
+    const payload = this.jwtService.decode(refreshToken) as any;
+    if (payload.jti) {
+      return `bl:refresh:${payload.jti}`;
+    }
+    return `bl:refresh:${payload.sub}:${payload.iat}`;
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex').substring(0, 16);
+  }
+
+  async blacklistAccessToken(accessToken: string) {
+    const key = this.getAccessTokenKey(accessToken);
+    const payload = this.jwtService.decode(accessToken) as any;
+    const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
+
+    console.log('將 Access Token 加入黑名單');
+    console.log('Token Key:', key);
+    console.log('Token JTI:', payload.jti);
+    console.log('Token 剩餘時間:', expiresIn);
+    console.log('設定寬限期:', 30);
+
+    if (expiresIn > 0) {
+      // 固定 30 秒寬限期
+      const gracePeriod = 30; // 30 秒寬限期
+      
+      // 設定黑名單標記，使用 Token 的剩餘時間作為 TTL
+      await this.redis.set(key, 'blacklisted', 'EX', expiresIn);
+      console.log('已設定黑名單 Key:', key, 'TTL:', expiresIn);
+      
+      // 設定寬限期標記，只存在 30 秒
+      const graceKey = `${key}:grace`;
+      await this.redis.set(graceKey, '1', 'EX', gracePeriod);
+      console.log('已設定寬限期 Key:', graceKey, 'TTL:', gracePeriod);
+    } else {
+      console.log('Token 已過期，無需加入黑名單');
+    }
+  }
+
+  async logout(refreshToken: string, accessToken?: string) {
+    // Blacklist Refresh Token
+    const refreshKey = this.getRefreshKey(refreshToken);
+    const refreshPayload = this.jwtService.decode(refreshToken) as any;
+    const refreshExpiresIn = refreshPayload.exp - Math.floor(Date.now() / 1000);
+
+    if (refreshExpiresIn > 0) {
+      await this.redis.set(refreshKey, 'blacklisted', 'EX', refreshExpiresIn);
+    }
+
+    // Blacklist Access Token (如果提供)
+    if (accessToken) {
+      await this.blacklistAccessToken(accessToken);
+    }
+
     return { success: true, message: '已登出' };
   }
 
-  async refreshToken(refreshToken: string) {
+  /**
+   * 檢查 access token 的剩餘有效時間
+   * @param accessToken access token
+   * @returns 剩餘時間（秒）
+   */
+  private getTokenRemainingTime(accessToken: string): number {
+    try {
+      const payload = this.jwtService.decode(accessToken) as any;
+      if (!payload || !payload.exp) {
+        return 0;
+      }
+      
+      const currentTime = Math.floor(Date.now() / 1000);
+      const remainingTime = payload.exp - currentTime;
+      
+      return Math.max(0, remainingTime);
+    } catch (error) {
+      console.error('檢查 Token 剩餘時間失敗:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * 獲取刷新閾值時間（秒）
+   * @returns 閾值時間（秒）
+   */
+  private getRefreshThreshold(): number {
+    const thresholdMinutes = parseInt(this.configService.get('TOKEN_REFRESH_THRESHOLD_MINUTES') || '10');
+    return thresholdMinutes * 60;
+  }
+
+  async refreshToken(refreshToken: string, oldAccessToken?: string) {
+    console.log('=== Refresh Token 請求開始 ===');
+    console.log('收到的 refresh token:', refreshToken?.substring(0, 20) + '...'); // 只顯示前20個字符
+
+    // 檢查 token 是否存在
+    if (!refreshToken) {
+      console.log('錯誤：未提供 refresh token');
+      throw new UnauthorizedException('未提供 refresh token');
+    }
+
+    // 檢查 token 是否在黑名單中
     const blacklisted = await this.redis.get(this.getRefreshKey(refreshToken));
-    if (blacklisted) throw new UnauthorizedException('Refresh token 已失效');
+    if (blacklisted) {
+      console.log('錯誤：Token 已被加入黑名單');
+      throw new UnauthorizedException('Refresh token 已失效');
+    }
 
     try {
+      console.log('開始驗證 refresh token...');
+
+      // 獲取 refresh secret
+      const refreshSecret = this.configService.get('JWT_REFRESH_SECRET');
+      console.log('使用的 refresh secret:', refreshSecret ? '已設置' : '未設置');
+
+      if (!refreshSecret) {
+        console.log('錯誤：JWT_REFRESH_SECRET 未設置');
+        throw new UnauthorizedException('伺服器配置錯誤：缺少 JWT_REFRESH_SECRET');
+      }
+
+      // 驗證 token
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
+        secret: refreshSecret,
       });
+      console.log('驗證成功，payload:', payload);
 
-      const user = await this.usersService.findById(payload.userId);
-      if (!user?.emailVerified) throw new UnauthorizedException('請先完成 Email 驗證');
+      // 檢查 payload 結構
+      if (!payload || !payload.sub) {
+        console.log('錯誤：Token payload 結構無效');
+        throw new UnauthorizedException('Token payload 結構無效');
+      }
 
-      const accessToken = this.jwtService.sign(
-        { userId: payload.userId },
-        { expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
-      );
+      // 查找使用者
+      const user = await this.usersService.findById(payload.sub);
+      if (!user) {
+        console.log('錯誤：找不到該使用者');
+        throw new UnauthorizedException('使用者不存在');
+      }
 
-      return { success: true, accessToken };
+      if (!user.emailVerified) {
+        console.log('錯誤：使用者信箱未驗證');
+        throw new UnauthorizedException('請先完成 Email 驗證');
+      }
+
+      // 智慧刷新邏輯
+      let accessTokenToReturn = oldAccessToken;
+      let refreshed = false;
+
+      if (oldAccessToken) {
+        const remainingTime = this.getTokenRemainingTime(oldAccessToken);
+        const refreshThreshold = this.getRefreshThreshold();
+        
+        console.log(`Token 剩餘時間: ${remainingTime} 秒，刷新閾值: ${refreshThreshold} 秒`);
+
+        if (remainingTime <= refreshThreshold) {
+          console.log('Token 剩餘時間不足，執行刷新');
+          
+          // 將舊的 Access Token 加入黑名單
+          console.log('將舊的 Access Token 加入黑名單');
+          await this.blacklistAccessToken(oldAccessToken);
+
+          console.log('使用者驗證成功，生成新的 access token...');
+
+          // 生成新的 access token（包含新的 JTI）
+          accessTokenToReturn = this.jwtService.sign(
+            { sub: payload.sub, jti: uuidv4() },
+            {
+              expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') || '1h',
+              secret: this.configService.get('JWT_SECRET')
+            }
+          );
+          refreshed = true;
+
+          // 檢查新生成的 Token 是否有 JTI
+          const newTokenPayload = this.jwtService.decode(accessTokenToReturn) as any;
+          console.log('新生成的 Access Token JTI:', newTokenPayload.jti);
+        } else {
+          console.log('Token 剩餘時間充足，直接返回現有 Token');
+        }
+      } else {
+        console.log('未提供舊的 Access Token，生成新的 access token...');
+        
+        // 生成新的 access token（包含新的 JTI）
+        accessTokenToReturn = this.jwtService.sign(
+          { sub: payload.sub, jti: uuidv4() },
+          {
+            expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') || '1h',
+            secret: this.configService.get('JWT_SECRET')
+          }
+        );
+        refreshed = true;
+      }
+
+      const remainingTime = this.getTokenRemainingTime(accessTokenToReturn);
+
+      console.log('=== Refresh Token 請求成功 ===');
+      return { 
+        success: true, 
+        accessToken: accessTokenToReturn,
+        expiresIn: remainingTime,
+        refreshed: refreshed
+      };
+
     } catch (err) {
-      throw new UnauthorizedException('Refresh token 驗證失敗');
+      console.log('=== Refresh Token 驗證失敗 ===');
+      console.log('錯誤類型:', err.constructor.name);
+      console.log('錯誤訊息:', err.message);
+      console.log('錯誤堆疊:', err.stack);
+
+      if (err.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Refresh token 已過期');
+      } else if (err.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Refresh token 格式無效');
+      } else {
+        throw new UnauthorizedException('Refresh token 驗證失敗');
+      }
     }
   }
 
   generateTokens(userId: number) {
-    const accessToken = this.jwtService.sign(
-      { userId },
-      { secret: this.configService.get('JWT_SECRET'), expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
-    );
-    const refreshToken = this.jwtService.sign(
-      { userId },
-      { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') }
-    );
-    return { success: true, accessToken, refreshToken, };
+    const jti = uuidv4(); // 使用現有的 uuidv4
+    const payload = { sub: userId, jti };
+
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
+    });
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken,
+    };
   }
+
+  //old
+  // generateTokens(userId: number) {
+  //   const accessToken = this.jwtService.sign(
+  //     { userId },
+  //     { secret: this.configService.get('JWT_SECRET'), expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN') }
+  //   );
+  //   const refreshToken = this.jwtService.sign(
+  //     { userId },
+  //     { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') }
+  //   );
+  //   return { success: true, accessToken, refreshToken, };
+  // }
 
   // 註冊流程 - 建立帳號並寄送驗證信
 
@@ -237,11 +466,11 @@ export class AuthService {
     let user = await this.usersService.findByEmail(payload.email);
     if (!user) {
       // 如果使用者不存在，則創建新使用者
-      user = await this.usersService.create({
+      user = await this.usersService.createSocialUser({
         email: payload.email,
-        password: '', // 社交登入通常不需要密碼
-        provider: 'google', // 設定提供者為 Google
-        name: payload.name, // 使用 Google 提供的名稱
+        provider: 'google',
+        providerId: payload.sub, // 使用 Google 提供的唯一識別碼
+        name: payload.name,
       });
     }
 
@@ -325,11 +554,11 @@ export class AuthService {
     // Find or create user by email
     let user = await this.usersService.findByEmail(facebookData.email);
     if (!user) {
-      user = await this.usersService.create({
+      user = await this.usersService.createSocialUser({
         email: facebookData.email,
-        password: '',
         provider: 'facebook',
-        name: facebookData.name, // Limited Login 可能沒有 name，需要處理
+        providerId: facebookData.id, // 使用 Facebook 提供的唯一識別碼
+        name: facebookData.name,
       });
     }
 
@@ -427,10 +656,10 @@ export class AuthService {
   
       let user = await this.usersService.findByEmail(email);
       if (!user) {
-        user = await this.usersService.create({
+        user = await this.usersService.createSocialUser({
           email,
-          password: '',
           provider: 'wechat',
+          providerId: identifier, // 使用 WeChat 提供的唯一識別碼
           name: '',
         });
       }

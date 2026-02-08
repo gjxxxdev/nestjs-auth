@@ -4,9 +4,13 @@ import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
+import { IapModule } from './iap/iap.module';
+import { BookstoreModule } from './bookstore/bookstore.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
+    BookstoreModule,
     ConfigModule.forRoot({ isGlobal: true }),
     JwtModule.register({
       global: true,
@@ -15,6 +19,8 @@ import { PrismaService } from './prisma.service';
     }),
     AuthModule,
     UsersModule,
+    IapModule,
+    OrdersModule
   ],
   providers: [PrismaService],
 })

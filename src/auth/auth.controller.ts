@@ -1,10 +1,11 @@
 // （含 refresh / logout / 第三方登入 / Email 驗證 / 忘記密碼）
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiOperation, ApiUnauthorizedResponse, ApiResponse, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto'; // 引入新的刷新令牌回應 DTO
+import { TokenInfoResponseDto } from './dto/token-info-response.dto'; // 引入 Token 資訊回應 DTO
 import { LoginResponseDto } from './dto/login-response.dto'; // 引入新的登入回應 DTO
 import { GoogleLoginResponseDto } from './dto/google-login-response.dto'; // 引入 Google 登入回應 DTO
 import { FacebookLoginResponseDto } from './dto/facebook-login-response.dto'; // 引入 Facebook 登入回應 DTO
@@ -25,6 +26,7 @@ import { RefreshTokenRequestDto } from './dto/refresh-token-request.dto'; // 引
 import { LogoutRequestDto } from './dto/logout-request.dto'; // 引入登出請求 DTO
 import { VerifyEmailRequestDto } from './dto/verify-email-request.dto'; // 引入 Email 驗證請求 DTO
 import { ResendVerificationRequestDto } from './dto/resend-verification-request.dto'; // 引入重新發送驗證信請求 DTO
+import { JwtAuthGuard } from './jwt-auth.guard'; // 引入 JWT 守衛
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -109,20 +111,21 @@ export class AuthController {
   }
 
   @ApiUnauthorizedResponse({ description: 'refresh token 無效或信箱未驗證' })
-  @ApiOperation({ summary: '使用 refresh token 取得新的 access token' })
-  @ApiOkResponse({ description: '成功取得新 accessToken', type: RefreshTokenResponseDto })
+  @ApiOperation({ summary: '智慧刷新 access token：只有在剩餘時間不足時才刷新，否則返回現有 token' })
+  @ApiOkResponse({ description: '成功取得 access token（可能已刷新或直接返回）', type: TokenInfoResponseDto })
   @ApiBody({ type: RefreshTokenRequestDto }) // 為 refresh 請求體提供範例值
   @Post('refresh')
   async refresh(@Body() body: RefreshTokenRequestDto) {
-    return this.authService.refreshToken(body.refreshToken);
+    return this.authService.refreshToken(body.refreshToken, body.accessToken);
   }
   
   @ApiOperation({ summary: '使用者登出並將 refresh token 加入黑名單' })
   @ApiOkResponse({ description: '登出成功，Refresh token 已加入黑名單', type: LogoutResponseDto })
   @ApiBody({ type: LogoutRequestDto }) // 為 logout 請求體提供範例值
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(@Body() body: LogoutRequestDto) {
-    return this.authService.logout(body.refreshToken);
+    return this.authService.logout(body.refreshToken, body.accessToken);
   }
 
   @ApiUnauthorizedResponse({ description: '驗證連結已過期或無效' })
