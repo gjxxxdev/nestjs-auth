@@ -391,12 +391,33 @@ export class AuthService {
 
   // 註冊流程 - 建立帳號並寄送驗證信
 
-  async register({ email, password, name }: { email: string; password: string; name?: string }) {
+  async register({ 
+    email, 
+    password, 
+    name, 
+    birth_date, 
+    gender, 
+    role_level 
+  }: { 
+    email: string; 
+    password: string; 
+    name?: string;
+    birth_date?: string;
+    gender?: number;
+    role_level?: number;
+  }) {
     const existing = await this.usersService.findByEmail(email);
     if (existing) throw new UnauthorizedException('Email 已註冊');
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await this.usersService.create({ email, password: hashed, name });
+    const user = await this.usersService.create({ 
+      email, 
+      password: hashed, 
+      name,
+      birth_date: birth_date ? new Date(birth_date) : undefined,
+      gender: gender !== undefined ? gender : 0,
+      role_level: role_level !== undefined ? role_level : 1
+    });
 
     const verifyToken = uuidv4();
     const redisKey = `verify:${verifyToken}`;
