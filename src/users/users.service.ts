@@ -8,25 +8,46 @@ export class UsersService {
   /**
    * 根據使用者 ID 取得使用者個人資料
    * @param userId 使用者 ID
-   * @returns 使用者資料，包含 id, email, name, provider, emailVerified, createdAt
+   * @returns 使用者資料，包含 id, email, name, provider, emailVerified, birth_date, gender, role_level, createdAt
    */
   async getProfile(userId: number) {
     return this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, provider: true, emailVerified: true, createdAt: true },
+      select: { 
+        id: true, 
+        email: true, 
+        name: true, 
+        provider: true, 
+        emailVerified: true, 
+        birth_date: true,
+        gender: true,
+        role_level: true,
+        createdAt: true 
+      },
     });
   }
 
   /**
    * 更新使用者個人資料
    * @param userId 使用者 ID
-   * @param data 要更新的資料 (例如: name)
+   * @param data 要更新的資料 (例如: name, birth_date, gender, role_level)
    * @returns 更新後的使用者資料
    */
-  async updateProfile(userId: number, data: { name?: string }) {
+  async updateProfile(userId: number, data: { 
+    name?: string;
+    birth_date?: string;
+    gender?: number;
+    role_level?: number;
+  }) {
+    // 如果有 birth_date，需要轉換為 Date 物件
+    const updateData: any = { ...data };
+    if (data.birth_date) {
+      updateData.birth_date = new Date(data.birth_date);
+    }
+    
     return this.prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
     });
   }
 
@@ -41,10 +62,18 @@ export class UsersService {
 
   /**
    * 建立新使用者
-   * @param data 使用者資料，包含 email, password, name, provider
+   * @param data 使用者資料，包含 email, password, name, provider, birth_date, gender, role_level
    * @returns 新建立的使用者資料
    */
-  async create(data: { email: string; password: string; name?: string; provider?: string }) {
+  async create(data: { 
+    email: string; 
+    password: string; 
+    name?: string; 
+    provider?: string;
+    birth_date?: Date;
+    gender?: number;
+    role_level?: number;
+  }) {
     return this.prisma.user.create({ data });
   }
 

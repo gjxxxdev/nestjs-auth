@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsDateString, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -17,6 +17,23 @@ export class RegisterDto {
   @IsOptional()
   @IsString({ message: '名稱必須是字串' })
   name?: string;
+
+  @ApiProperty({ example: '2010-01-01', description: '出生年月', required: false })
+  @IsOptional()
+  @IsDateString({}, { message: '出生年月格式不正確，應為 ISO 8601 日期格式' })
+  birth_date?: string;
+
+  @ApiProperty({ example: 0, description: '性別 (1:男, 2:女, 0:未指定)', required: false })
+  @IsOptional()
+  @IsNumber({}, { message: '性別必須是數字' })
+  @Min(0, { message: '性別應在 0-2 之間' })
+  @Max(2, { message: '性別應在 0-2 之間' })
+  gender?: number;
+
+  @ApiProperty({ example: 1, description: '權限級別 (1:普通, 5:小編, 9:Admin)', required: false })
+  @IsOptional()
+  @IsNumber({}, { message: '權限級別必須是數字' })
+  role_level?: number;
 }
 
 export class LoginDto {
