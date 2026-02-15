@@ -4,7 +4,7 @@ import { IapService } from './iap.service';
 import { IapResponseDto } from './dto/iap-response.dto';
 import { VerifyReceiptRequestDto } from './dto/verify-receipt-request.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('IAP')
 @ApiBearerAuth()
