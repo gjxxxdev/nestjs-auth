@@ -10,7 +10,7 @@ export class UpdateUserDto {
   @ApiPropertyOptional({ example: '2010-01-01', description: '出生年月' })
   @IsOptional()
   @IsDateString({}, { message: '出生年月格式不正確，應為 ISO 8601 日期格式' })
-  birth_date?: string;
+  birthDate?: string;
 
   @ApiPropertyOptional({ example: 0, description: '性別 (1:男, 2:女, 0:未指定)' })
   @IsOptional()
@@ -22,7 +22,7 @@ export class UpdateUserDto {
   @ApiPropertyOptional({ example: 1, description: '權限級別 (1:普通, 5:小編, 9:Admin)' })
   @IsOptional()
   @IsNumber({}, { message: '權限級別必須是數字' })
-  role_level?: number;
+  roleLevel?: number;
 }
 
 // src/auth/dto/auth.dto.ts
