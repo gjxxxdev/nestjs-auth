@@ -17,13 +17,13 @@ export class GetUserProfileResponseDto {
   emailVerified: boolean;
 
   @ApiProperty({ example: '2010-01-01', description: '出生年月', nullable: true })
-  birth_date: Date | null;
+  birthDate: Date | null;
 
   @ApiProperty({ example: 0, description: '性別 (1:男, 2:女, 0:未指定)' })
   gender: number;
 
   @ApiProperty({ example: 1, description: '權限級別 (1:普通, 5:小編, 9:Admin)' })
-  role_level: number;
+  roleLevel: number;
 
   @ApiProperty({ example: '2025-08-15T15:05:10.000Z', description: '帳號建立時間' })
   createdAt: Date;

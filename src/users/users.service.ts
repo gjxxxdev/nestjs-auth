@@ -8,7 +8,7 @@ export class UsersService {
   /**
    * 根據使用者 ID 取得使用者個人資料
    * @param userId 使用者 ID
-   * @returns 使用者資料，包含 id, email, name, provider, emailVerified, birth_date, gender, role_level, createdAt
+   * @returns 使用者資料，包含 id, email, name, provider, emailVerified, birthDate, gender, roleLevel, createdAt
    */
   async getProfile(userId: number) {
     return this.prisma.user.findUnique({
@@ -19,9 +19,9 @@ export class UsersService {
         name: true, 
         provider: true, 
         emailVerified: true, 
-        birth_date: true,
+        birthDate: true,
         gender: true,
-        role_level: true,
+        roleLevel: true,
         createdAt: true 
       },
     });
@@ -30,20 +30,21 @@ export class UsersService {
   /**
    * 更新使用者個人資料
    * @param userId 使用者 ID
-   * @param data 要更新的資料 (例如: name, birth_date, gender, role_level)
+   * @param data 要更新的資料 (例如: name, birthDate, gender, roleLevel)
    * @returns 更新後的使用者資料
    */
   async updateProfile(userId: number, data: { 
     name?: string;
-    birth_date?: string;
+    birthDate?: string;
     gender?: number;
-    role_level?: number;
+    roleLevel?: number;
   }) {
-    // 如果有 birth_date，需要轉換為 Date 物件
-    const updateData: any = { ...data };
-    if (data.birth_date) {
-      updateData.birth_date = new Date(data.birth_date);
-    }
+    // 轉換駝峰命名為 snake_case
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.gender !== undefined) updateData.gender = data.gender;
+    if (data.roleLevel !== undefined) updateData.role_level = data.roleLevel;
+    if (data.birthDate) updateData.birth_date = new Date(data.birthDate);
     
     return this.prisma.user.update({
       where: { id: userId },
@@ -62,7 +63,7 @@ export class UsersService {
 
   /**
    * 建立新使用者
-   * @param data 使用者資料，包含 email, password, name, provider, birth_date, gender, role_level
+   * @param data 使用者資料，包含 email, password, name, provider, birthDate, gender, roleLevel
    * @returns 新建立的使用者資料
    */
   async create(data: { 
@@ -70,11 +71,22 @@ export class UsersService {
     password: string; 
     name?: string; 
     provider?: string;
-    birth_date?: Date;
+    birthDate?: Date;
     gender?: number;
-    role_level?: number;
+    roleLevel?: number;
   }) {
-    return this.prisma.user.create({ data });
+    // 轉換駝峰命名為 snake_case
+    const createData: any = {
+      email: data.email,
+      password: data.password,
+    };
+    if (data.name) createData.name = data.name;
+    if (data.provider) createData.provider = data.provider;
+    if (data.birthDate) createData.birth_date = data.birthDate;
+    if (data.gender !== undefined) createData.gender = data.gender;
+    if (data.roleLevel !== undefined) createData.role_level = data.roleLevel;
+    
+    return this.prisma.user.create({ data: createData });
   }
 
   /**

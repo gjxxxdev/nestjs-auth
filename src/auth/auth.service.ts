@@ -395,16 +395,16 @@ export class AuthService {
     email, 
     password, 
     name, 
-    birth_date, 
+    birthDate, 
     gender, 
-    role_level 
+    roleLevel 
   }: { 
     email: string; 
     password: string; 
     name?: string;
-    birth_date?: string;
+    birthDate?: string;
     gender?: number;
-    role_level?: number;
+    roleLevel?: number;
   }) {
     const existing = await this.usersService.findByEmail(email);
     if (existing) throw new UnauthorizedException('Email 已註冊');
@@ -414,9 +414,9 @@ export class AuthService {
       email, 
       password: hashed, 
       name,
-      birth_date: birth_date ? new Date(birth_date) : undefined,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
       gender: gender !== undefined ? gender : 0,
-      role_level: role_level !== undefined ? role_level : 1
+      roleLevel: roleLevel !== undefined ? roleLevel : 1
     });
 
     const verifyToken = uuidv4();

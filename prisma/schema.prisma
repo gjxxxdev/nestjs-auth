@@ -15,9 +15,9 @@ model User {
   provider      String?   @db.VarChar(255)
   providerId    String?   @unique(map: "providerId") @db.VarChar(255)
   emailVerified Boolean   @default(false)
-  birth_date    DateTime?
+  birthDate     DateTime? @map("birth_date")
   gender        Int       @default(0)
-  role_level    Int       @default(1)
+  roleLevel     Int       @default(1) @map("role_level")
   createdAt     DateTime  @default(now()) @db.DateTime(0)
   updatedAt     DateTime  @default(now()) @updatedAt @db.DateTime(0)
 }
