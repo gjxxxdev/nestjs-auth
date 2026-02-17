@@ -355,9 +355,9 @@ export class AuthService {
     }
   }
 
-  generateTokens(userId: number) {
+  generateTokens(userId: number, roleLevel?: number) {
     const jti = uuidv4(); // 使用現有的 uuidv4
-    const payload = { sub: userId, jti };
+    const payload = { sub: userId, jti, role: roleLevel || 1 };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_SECRET'),
@@ -497,7 +497,7 @@ export class AuthService {
 
     // 生成 JWT Token 並返回
     // Generate JWT Token and return
-    return this.generateTokens(user.id);
+    return this.generateTokens(user.id, user.roleLevel);
   }
 
   /**
@@ -585,7 +585,7 @@ export class AuthService {
 
     // 產生 JWT token
     // Generate JWT token
-    return this.generateTokens(user.id);
+    return this.generateTokens(user.id, user.roleLevel);
   }
 
   /**
@@ -648,7 +648,7 @@ export class AuthService {
 
       // 產生 JWT token
       // Generate JWT token
-      return this.generateTokens(user.id);
+      return this.generateTokens(user.id, user.roleLevel);
 
     } catch (error) {
       console.error('Apple 登入錯誤:', error); // 記錄錯誤訊息
@@ -687,7 +687,7 @@ export class AuthService {
   
       // 產生 JWT token
       // Generate JWT token
-      return this.generateTokens(user.id);
+      return this.generateTokens(user.id, user.roleLevel);
     } catch (err) {
       throw new UnauthorizedException('WeChat token 驗證失敗');
     }
@@ -709,6 +709,6 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('密碼錯誤');
     // 產生 JWT token
     // Generate JWT token
-    return this.generateTokens(user.id);
+    return this.generateTokens(user.id, user.roleLevel);
   }
 }

@@ -145,4 +145,48 @@ export class UsersService {
       },
     });
   }
+
+  /**
+   * 硬刪除使用者帳號及其所有關聯資料
+   * 使用交易確保原子性 - 若任何步驟失敗，所有變更都會回滾
+   * @param userId 要刪除的使用者 ID
+   * @param requesterId 提出刪除請求的使用者 ID（可選）
+   * @param isAdmin 請求者是否為管理員（可選）
+   * @returns 已刪除的使用者資料
+   */
+  async hardDeleteUser(userId: number, requesterId?: number, isAdmin?: boolean) {
+    // 權限檢查
+    if (requesterId && requesterId !== userId && !isAdmin) {
+      throw new Error('您沒有權限刪除此帳號');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. 刪除書籍閱讀權益 (entitlements)
+      await tx.entitlements.deleteMany({
+        where: { user_id: userId },
+      });
+
+      // 2. 刪除書籍購買訂單 (book_orders)
+      await tx.book_orders.deleteMany({
+        where: { user_id: userId },
+      });
+
+      // 3. 刪除 IAP 儲值收據 (iap_receipts)
+      await tx.iapReceipt.deleteMany({
+        where: { userId: userId },
+      });
+
+      // 4. 刪除金幣流水紀錄 (coin_ledger)
+      await tx.coinLedger.deleteMany({
+        where: { userId: userId },
+      });
+
+      // 5. 刪除使用者帳號 (user)
+      const deletedUser = await tx.user.delete({
+        where: { id: userId },
+      });
+
+      return deletedUser;
+    });
+  }
 }
