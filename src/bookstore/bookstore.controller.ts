@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards, Logger } from '@nestjs/common';
 import { BookstoreService } from './bookstore.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiUnauthorizedResponse, ApiForbiddenResponse, ApiInternalServerErrorResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiUnauthorizedResponse, ApiForbiddenResponse, ApiInternalServerErrorResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { BookstoreItemDto } from './dto/get-bookstore-list-response.dto';
 import { GetMyEntitlementsResponseDto } from './dto/get-my-entitlements-response.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -52,6 +52,7 @@ export class BookstoreController {
 
   @Get('me/entitlements')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: '取得我已購買的書籍' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '頁碼（預設 1）', example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '每頁筆數（預設 20）', example: 20 })
