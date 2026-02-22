@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Logger } from '@nestjs/common';
 import { BookstoreService } from './bookstore.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiUnauthorizedResponse, ApiForbiddenResponse, ApiInternalServerErrorResponse, ApiQuery } from '@nestjs/swagger';
 import { BookstoreItemDto } from './dto/get-bookstore-list-response.dto';
@@ -9,6 +9,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiTags('BookStore')
 @Controller()
 export class BookstoreController {
+  private readonly logger = new Logger(BookstoreController.name);
+
   constructor(private readonly bookstoreService: BookstoreService) {}
 
   @Get('bookstorelist')
@@ -83,8 +85,27 @@ export class BookstoreController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    this.logger.log('🔵 [BookstoreController] getMyEntitlements() 被呼叫');
+    this.logger.log('🔵 [BookstoreController] @CurrentUser() 返回:', JSON.stringify(user, null, 2));
+
+    if (!user) {
+      this.logger.error('❌ [BookstoreController] user 為 undefined，認證失敗');
+      throw new Error('認證失敗，用戶信息為 undefined');
+    }
+
+    if (!user.userId) {
+      this.logger.error('❌ [BookstoreController] user.userId 為 undefined，可能是 JWT decode 錯誤');
+      this.logger.error('🔴 user 物件結構:', Object.keys(user));
+      throw new Error('用戶 ID 無效');
+    }
+
+    this.logger.log('✅ [BookstoreController] 已取得 userId:', user.userId);
+
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
+
+    this.logger.log(`🔵 [BookstoreController] 查詢分頁: page=${pageNum}, limit=${limitNum}`);
+
     return this.bookstoreService.getUserEntitlements(user.userId, pageNum, limitNum);
   }
 }
