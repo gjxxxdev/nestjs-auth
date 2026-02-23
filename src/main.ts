@@ -11,13 +11,13 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Auth API')
     .setDescription('多登入來源整合後端 API 文件')
-    .setVersion('1.2')
+    .setVersion('1.5')
     .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(3000);
+  await app.listen(3001);
 }
 bootstrap();

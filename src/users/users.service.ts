@@ -39,12 +39,12 @@ export class UsersService {
     gender?: number;
     roleLevel?: number;
   }) {
-    // 轉換駝峰命名為 snake_case
+    // 使用 Prisma 模型屬性名稱（駝峰命名）
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.gender !== undefined) updateData.gender = data.gender;
-    if (data.roleLevel !== undefined) updateData.role_level = data.roleLevel;
-    if (data.birthDate) updateData.birth_date = new Date(data.birthDate);
+    if (data.roleLevel !== undefined) updateData.roleLevel = data.roleLevel;
+    if (data.birthDate) updateData.birthDate = new Date(data.birthDate);
     
     return this.prisma.user.update({
       where: { id: userId },
@@ -75,16 +75,16 @@ export class UsersService {
     gender?: number;
     roleLevel?: number;
   }) {
-    // 轉換駝峰命名為 snake_case
+    // 使用 Prisma 模型屬性名稱（駝峰命名）
     const createData: any = {
       email: data.email,
       password: data.password,
     };
     if (data.name) createData.name = data.name;
     if (data.provider) createData.provider = data.provider;
-    if (data.birthDate) createData.birth_date = data.birthDate;
+    if (data.birthDate) createData.birthDate = data.birthDate;
     if (data.gender !== undefined) createData.gender = data.gender;
-    if (data.roleLevel !== undefined) createData.role_level = data.roleLevel;
+    if (data.roleLevel !== undefined) createData.roleLevel = data.roleLevel;
     
     return this.prisma.user.create({ data: createData });
   }
