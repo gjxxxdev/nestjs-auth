@@ -11,7 +11,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Auth API')
     .setDescription('多登入來源整合後端 API 文件')
-    .setVersion('1.5')
+    .setVersion('1.6')
     .addBearerAuth()
     .build();
 
