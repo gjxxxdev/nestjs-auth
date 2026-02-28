@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -39,6 +39,42 @@ export class UsersService {
     gender?: number;
     roleLevel?: number;
   }) {
+    // 使用 Prisma 模型屬性名稱（駝峰命名）
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.gender !== undefined) updateData.gender = data.gender;
+    if (data.roleLevel !== undefined) updateData.roleLevel = data.roleLevel;
+    if (data.birthDate) updateData.birthDate = new Date(data.birthDate);
+    
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+  }
+
+  /**
+   * 更新使用者個人資料，含權限檢查
+   * @param userId 使用者 ID
+   * @param requesterRoleLevel 請求者的 roleLevel
+   * @param data 要更新的資料
+   * @returns 更新後的使用者資料
+   * @throws ForbiddenException 如果普通使用者嘗試修改 roleLevel
+   */
+  async updateProfileWithPermissionCheck(
+    userId: number,
+    requesterRoleLevel: number,
+    data: { 
+      name?: string;
+      birthDate?: string;
+      gender?: number;
+      roleLevel?: number;
+    },
+  ) {
+    // 檢查是否為普通使用者嘗試修改 roleLevel
+    if (data.roleLevel !== undefined && requesterRoleLevel < 9) {
+      throw new ForbiddenException('只有管理員(role_level=9)可以修改權限級別');
+    }
+
     // 使用 Prisma 模型屬性名稱（駝峰命名）
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
