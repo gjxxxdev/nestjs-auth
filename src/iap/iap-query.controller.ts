@@ -8,6 +8,8 @@ import { MyIapReceiptDto } from './dto/my-iap-receipt.dto';
 import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
 import { AdminIapReceiptsQueryDto } from './dto/admin-iap-receipts-query.dto';
 import { AdminIapReceiptsResponseDto } from './dto/admin-iap-receipts-response.dto';
+import { AdminCoinLedgerQueryDto } from './dto/admin-coin-ledger-query.dto';
+import { AdminCoinLedgerResponseDto } from './dto/admin-coin-ledger-response.dto';
 
 @ApiTags('IAP / Coins')
 @ApiBearerAuth()
@@ -131,5 +133,89 @@ export class IapQueryController {
     const limit = query.limit || 20;
 
     return this.iapQueryService.getAdminIapReceipts(query.userId, page, limit);
+  }
+
+  @Get('admin/coins/ledger')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: '【後台】查詢用戶的金幣流水' })
+  @ApiQuery({
+    name: 'userId',
+    description: '用戶 ID（必填）',
+    type: Number,
+    example: 123,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'page',
+    description: '頁碼（可選，預設 1）',
+    type: Number,
+    example: 1,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: '每頁筆數（可選，預設 20，最多 100）',
+    type: Number,
+    example: 20,
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: '成功獲取用戶金幣流水',
+    type: AdminCoinLedgerResponseDto,
+    example: {
+      items: [
+        {
+          id: 101,
+          amount: 100,
+          balance: 1500,
+          type: 'IAP',
+          source: 'ORDER:GPA.1234|PROD:coins_100',
+          createdAt: '2026-02-27T10:30:00.000Z',
+          userId: 12,
+          username: 'John Doe',
+          email: 'john@example.com',
+        },
+        {
+          id: 100,
+          amount: -50,
+          balance: 1400,
+          type: 'USE',
+          source: 'SHOP:book_001',
+          createdAt: '2026-02-26T15:20:00.000Z',
+          userId: 12,
+          username: 'John Doe',
+          email: 'john@example.com',
+        },
+      ],
+      pagination: {
+        total: 100,
+        page: 1,
+        limit: 20,
+        pages: 5,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: '無管理員權限',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'userId 必須是有效的整數',
+  })
+  async getAdminCoinLedger(
+    @Query() query: AdminCoinLedgerQueryDto,
+    @CurrentUser() user: any,
+  ): Promise<AdminCoinLedgerResponseDto> {
+    // 驗證 userId
+    if (!query.userId || query.userId <= 0) {
+      throw new BadRequestException('userId 必須是大於 0 的整數');
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
+    return this.iapQueryService.getAdminCoinLedger(query.userId, page, limit);
   }
 }
