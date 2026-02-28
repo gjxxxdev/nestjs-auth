@@ -1,8 +1,9 @@
 //（使用者資訊查詢 / 更新）
 
-import { Controller, Get, Patch, Delete, Body, Request, UseGuards, HttpCode, HttpStatus, Query, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Body, Request, UseGuards, HttpCode, HttpStatus, Query, ForbiddenException, BadRequestException, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetUserProfileResponseDto } from './dto/get-user-profile-response.dto';
@@ -26,8 +27,28 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   @ApiOperation({ summary: '更新使用者自己的個人資料' })
+  @ApiResponse({ status: 200, description: '成功更新個人資料' })
+  @ApiResponse({ status: 403, description: '普通使用者不可修改 role_level' })
   updateMe(@Request() req, @Body() body: UpdateUserDto) {
-    return this.usersService.updateProfile(req.user.userId, body);  
+    const roleLevel = req.user.roleLevel || 1;
+    return this.usersService.updateProfileWithPermissionCheck(req.user.userId, roleLevel, body);  
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Patch(':targetId')
+  @ApiOperation({ summary: '管理員修改指定使用者的個人資料與權限級別' })
+  @ApiResponse({ status: 200, description: '成功更新使用者資料' })
+  @ApiResponse({ status: 403, description: '只有管理員才能執行此操作' })
+  @ApiResponse({ status: 404, description: '使用者不存在' })
+  updateUserAsAdmin(@Request() req, @Param('targetId') targetId: string, @Body() body: UpdateUserDto) {
+    const adminRoleLevel = req.user.roleLevel || 1;
+    const userId = parseInt(targetId, 10);
+    
+    if (isNaN(userId)) {
+      throw new BadRequestException('無效的使用者 ID 格式');
+    }
+
+    return this.usersService.updateProfileWithPermissionCheck(userId, adminRoleLevel, body);
   }
 
   @UseGuards(JwtAuthGuard)
