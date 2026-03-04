@@ -7,6 +7,7 @@ import { PrismaService } from './prisma.service';
 import { IapModule } from './iap/iap.module';
 import { BookstoreModule } from './bookstore/bookstore.module';
 import { OrdersModule } from './orders/orders.module';
+import { ActivitiesModule } from './activities/activities.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { OrdersModule } from './orders/orders.module';
     AuthModule,
     UsersModule,
     IapModule,
-    OrdersModule
+    OrdersModule,
+    ActivitiesModule,
   ],
   providers: [PrismaService],
 })

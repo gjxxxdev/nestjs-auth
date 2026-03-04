@@ -92,6 +92,17 @@ model IapReceipt {
   @@map("iap_receipts")
 }
 
+model ActivityClaim {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  activity  String   @db.VarChar(50)
+  claimedAt DateTime @default(now()) @map("claimed_at") @db.DateTime(0)
+
+  @@unique([userId, activity], map: "uk_user_activity")
+  @@index([userId], map: "idx_user")
+  @@map("activity_claims")
+}
+
 model Abouts {
   id            Int      @id @default(autoincrement())
   lang          String?  @db.VarChar(255)
