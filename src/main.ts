@@ -10,8 +10,8 @@ async function bootstrap() {
   
   const config = new DocumentBuilder()
     .setTitle('Auth API')
-    .setDescription('多登入來源整合後端 API 文件')
-    .setVersion('1.8')
+    .setDescription('烏努努小說平台後端 API 文件')
+    .setVersion('1.9')
     .addBearerAuth()
     .build();
 

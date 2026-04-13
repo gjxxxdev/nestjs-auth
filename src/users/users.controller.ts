@@ -8,6 +8,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@ne
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetUserProfileResponseDto } from './dto/get-user-profile-response.dto';
 import { DeleteAccountResponseDto } from './dto/delete-account-response.dto';
+import { GetAllUsersResponseDto } from './dto/get-all-users-response.dto';
 
 
 @ApiTags('Users')
@@ -15,6 +16,69 @@ import { DeleteAccountResponseDto } from './dto/delete-account-response.dto';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Get('all')
+  @ApiOperation({ 
+    summary: '查詢所有使用者',
+    description: '僅限管理員（roleLevel >= 9）查詢。返回所有使用者的會員序號、帳號、出生年月、性別、註冊方式、建立時間和更新時間。支援分頁查詢。' 
+  })
+  @ApiQuery({ name: 'page', required: false, type: 'number', example: 1, description: '頁碼（預設 1，必須 > 0）' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', example: 10, description: '每頁數量（預設 10，必須 > 0）' })
+  @ApiResponse({ 
+    status: 200, 
+    description: '成功取得所有使用者列表',
+    type: GetAllUsersResponseDto,
+    example: {
+      success: true,
+      total: 25,
+      page: 1,
+      limit: 10,
+      data: [
+        {
+          id: 1,
+          email: 'admin@example.com',
+          name: 'Admin User',
+          birthDate: '1990-05-15T00:00:00.000Z',
+          gender: 1,
+          provider: 'email',
+          createdAt: '2025-08-15T15:05:10.000Z',
+          updatedAt: '2025-12-20T08:30:45.000Z',
+        },
+        {
+          id: 2,
+          email: 'user@example.com',
+          name: 'Regular User',
+          birthDate: '1995-03-20T00:00:00.000Z',
+          gender: 2,
+          provider: 'google',
+          createdAt: '2025-09-10T12:00:00.000Z',
+          updatedAt: '2025-12-15T10:15:30.000Z',
+        },
+      ],
+    }
+  })
+  @ApiResponse({ status: 403, description: '只有管理員才能執行此操作' })
+  @ApiResponse({ status: 400, description: '分頁參數無效' })
+  async getAllUsers(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<GetAllUsersResponseDto> {
+    // 參數驗證
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+
+    if (isNaN(pageNum) || pageNum <= 0) {
+      throw new BadRequestException('頁碼必須是大於 0 的數字');
+    }
+
+    if (isNaN(limitNum) || limitNum <= 0) {
+      throw new BadRequestException('每頁數量必須是大於 0 的數字');
+    }
+
+    return this.usersService.getAllUsers(pageNum, limitNum);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')

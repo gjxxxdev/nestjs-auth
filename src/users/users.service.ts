@@ -183,6 +183,45 @@ export class UsersService {
   }
 
   /**
+   * 查詢所有使用者，支援分頁
+   * @param page 頁碼（預設 1）
+   * @param limit 每頁數量（預設 10）
+   * @returns 分頁結果，包含總數、目前頁碼、每頁數量和使用者列表
+   */
+  async getAllUsers(page: number = 1, limit: number = 10) {
+    // 計算 skip
+    const skip = (page - 1) * limit;
+
+    // 並行查詢總數和分頁資料
+    const [total, users] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          birthDate: true,
+          gender: true,
+          provider: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      success: true,
+      total,
+      page,
+      limit,
+      data: users,
+    };
+  }
+
+  /**
    * 硬刪除使用者帳號及其所有關聯資料
    * 使用交易確保原子性 - 若任何步驟失敗，所有變更都會回滾
    * @param userId 要刪除的使用者 ID
