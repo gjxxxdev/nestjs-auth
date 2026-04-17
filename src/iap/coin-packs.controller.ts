@@ -1,8 +1,30 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  HttpCode,
+  UseGuards,
+  HttpException,
+} from '@nestjs/common';
 import { CoinPacksService } from './coin-packs.service';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiBadRequestResponse,
+  ApiForbiddenResponse,
+} from '@nestjs/swagger';
 import { GetCoinPacksRequestDto } from './dto/get-coin-packs-request.dto';
 import { GetCoinPacksResponseDto } from './dto/get-coin-packs-response.dto';
+import { CreateCoinPackRequestDto } from './dto/create-coin-pack-request.dto';
+import { CreateCoinPackResponseDto } from './dto/create-coin-pack-response.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('IAP - Coin Packs')
 @Controller('coin-packs')
@@ -53,5 +75,88 @@ export class CoinPacksController {
       success: true, 
       data: formattedPacks 
     };
+  }
+
+  /**
+   * 建立金幣儲值包 (Admin Only)
+   * @description 僅限管理員使用，用於建立新的金幣儲值包商品
+   * @requires JWT Token + Admin 權限 (roleLevel >= 9)
+   */
+  @Post()
+  @HttpCode(201)
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '建立金幣儲值包 (管理員專用)',
+    description: '建立新的金幣儲值包商品。需要 JWT Token 且用戶 roleLevel >= 9 (Admin)。',
+  })
+  @ApiCreatedResponse({
+    description: '成功建立金幣儲值包',
+    type: CreateCoinPackResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '參數驗證失敗或重複的 platform + productId 組合',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: 'validation failed: ...',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: '權限不足 (需要 Admin 權限)',
+    schema: {
+      example: {
+        message: '只有管理員可存取此資源',
+        error: 'Forbidden',
+        statusCode: 403,
+      },
+    },
+  })
+  async create(
+    @Body() createCoinPackDto: CreateCoinPackRequestDto,
+    @CurrentUser() user: any,
+  ): Promise<CreateCoinPackResponseDto> {
+    try {
+      // 權限檢查：AdminGuard 已確保 user.roleLevel >= 9
+      // (此檢查邏輯由 AdminGuard 執行，這裡作為註釋說明)
+      // if (!user || user.roleLevel < 9) {
+      //   throw new ForbiddenException('只有管理員可存取此資源');
+      // }
+
+      // 調用 Service 建立金幣儲值包
+      const coinPack = await this.coinPacksService.create(createCoinPackDto);
+
+      // 資料轉換 (Decimal → Number)
+      const response: CreateCoinPackResponseDto = {
+        success: true,
+        message: 'Created successfully',
+        data: {
+          id: coinPack.id,
+          platform: coinPack.platform as 'GOOGLE' | 'APPLE',
+          productId: coinPack.productId,
+          name: coinPack.name,
+          amount: coinPack.amount,
+          bonusAmount: coinPack.bonusAmount,
+          price: Number(coinPack.price),
+          currency: coinPack.currency,
+          isActive: coinPack.isActive,
+          sortOrder: coinPack.sortOrder,
+          createdAt: coinPack.createdAt,
+          updatedAt: coinPack.updatedAt,
+        },
+      };
+
+      return response;
+    } catch (error) {
+      // HttpException 已由 Service 層或 Guard 拋出，直接拋出
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // 其他未預期的錯誤
+      throw new HttpException('建立金幣儲值包失敗', 500);
+    }
   }
 }
