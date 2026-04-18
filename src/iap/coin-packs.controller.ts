@@ -169,8 +169,8 @@ export class CoinPacksController {
   }
 
   /**
-   * 更新金幣儲值包 (Admin Only) - 用於上下架管理
-   * @description 管理員可透過此端點更新金幣商品的 platform、product_id、name 和 is_active（上下架狀態）
+   * 更新金幣儲值包上下架狀態 (Admin Only)
+   * @description 管理員可透過此端點上下架指定的金幣商品
    * @requires JWT Token + Admin 權限 (roleLevel >= 9)
    */
   @Patch(':id')
@@ -183,19 +183,19 @@ export class CoinPacksController {
     example: 1,
   })
   @ApiOperation({
-    summary: '更新金幣儲值包 (管理員專用)',
-    description: '更新既有的金幣儲值包商品，支援更改 platform、product_id、name 和上下架狀態 (is_active)。需要 JWT Token 且用戶 roleLevel >= 9 (Admin)。',
+    summary: '上下架金幣商品 (管理員專用)',
+    description: '更新指定金幣商品的上下架狀態。需要 JWT Token 且用戶 roleLevel >= 9 (Admin)。',
   })
   @ApiOkResponse({
-    description: '成功更新金幣儲值包',
+    description: '成功更新金幣商品上下架狀態',
     type: UpdateCoinPackAdminResponseDto,
   })
   @ApiBadRequestResponse({
-    description: '參數驗證失敗或重複的 platform + productId 組合',
+    description: '參數驗證失敗 (is_active 必須為 0 或 1)',
     schema: {
       example: {
         statusCode: 400,
-        message: '此 platform 與 productId 的組合已存在',
+        message: 'validation failed: is_active 只能為 0 或 1',
         error: 'Bad Request',
       },
     },
@@ -211,7 +211,7 @@ export class CoinPacksController {
     },
   })
   @ApiNotFoundResponse({
-    description: '指定 ID 的金幣儲值包不存在',
+    description: '指定 ID 的金幣商品不存在',
     schema: {
       example: {
         statusCode: 404,
@@ -232,7 +232,7 @@ export class CoinPacksController {
       //   throw new ForbiddenException('只有管理員可存取此資源');
       // }
 
-      // 調用 Service 更新金幣儲值包
+      // 調用 Service 更新金幣商品上下架狀態
       const coinPack = await this.coinPacksService.updateCoinPackAdmin(
         id,
         updateCoinPackAdminDto,
@@ -266,7 +266,7 @@ export class CoinPacksController {
       }
 
       // 其他未預期的錯誤
-      throw new HttpException('更新金幣儲值包失敗', 500);
+      throw new HttpException('更新金幣商品上下架狀態失敗', 500);
     }
   }
 }
