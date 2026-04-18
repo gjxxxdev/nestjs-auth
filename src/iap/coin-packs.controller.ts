@@ -2,11 +2,14 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Query,
   Body,
+  Param,
   HttpCode,
   UseGuards,
   HttpException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { CoinPacksService } from './coin-packs.service';
 import {
@@ -15,13 +18,18 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiBadRequestResponse,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { GetCoinPacksRequestDto } from './dto/get-coin-packs-request.dto';
 import { GetCoinPacksResponseDto } from './dto/get-coin-packs-response.dto';
 import { CreateCoinPackRequestDto } from './dto/create-coin-pack-request.dto';
 import { CreateCoinPackResponseDto } from './dto/create-coin-pack-response.dto';
+import { UpdateCoinPackAdminRequestDto } from './dto/update-coin-pack-admin-request.dto';
+import { UpdateCoinPackAdminResponseDto } from './dto/update-coin-pack-admin-response.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -157,6 +165,108 @@ export class CoinPacksController {
 
       // 其他未預期的錯誤
       throw new HttpException('建立金幣儲值包失敗', 500);
+    }
+  }
+
+  /**
+   * 更新金幣儲值包 (Admin Only) - 用於上下架管理
+   * @description 管理員可透過此端點更新金幣商品的 platform、product_id、name 和 is_active（上下架狀態）
+   * @requires JWT Token + Admin 權限 (roleLevel >= 9)
+   */
+  @Patch(':id')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: '金幣儲值包 ID',
+    example: 1,
+  })
+  @ApiOperation({
+    summary: '更新金幣儲值包 (管理員專用)',
+    description: '更新既有的金幣儲值包商品，支援更改 platform、product_id、name 和上下架狀態 (is_active)。需要 JWT Token 且用戶 roleLevel >= 9 (Admin)。',
+  })
+  @ApiOkResponse({
+    description: '成功更新金幣儲值包',
+    type: UpdateCoinPackAdminResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '參數驗證失敗或重複的 platform + productId 組合',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: '此 platform 與 productId 的組合已存在',
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: '權限不足 (需要 Admin 權限，roleLevel >= 9)',
+    schema: {
+      example: {
+        message: '只有管理員可存取此資源',
+        error: 'Forbidden',
+        statusCode: 403,
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    description: '指定 ID 的金幣儲值包不存在',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: '金幣儲值包不存在 (ID: 999)',
+        error: 'Not Found',
+      },
+    },
+  })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCoinPackAdminDto: UpdateCoinPackAdminRequestDto,
+    @CurrentUser() user: any,
+  ): Promise<UpdateCoinPackAdminResponseDto> {
+    try {
+      // 權限檢查：AdminGuard 已確保 user.roleLevel >= 9
+      // 此檢查邏輯由 AdminGuard 執行，以下作為註釋說明
+      // if (!user || user.roleLevel < 9) {
+      //   throw new ForbiddenException('只有管理員可存取此資源');
+      // }
+
+      // 調用 Service 更新金幣儲值包
+      const coinPack = await this.coinPacksService.updateCoinPackAdmin(
+        id,
+        updateCoinPackAdminDto,
+      );
+
+      // 資料轉換 (Decimal → Number)
+      const response: UpdateCoinPackAdminResponseDto = {
+        success: true,
+        message: 'Updated successfully',
+        data: {
+          id: coinPack.id,
+          platform: coinPack.platform as 'GOOGLE' | 'APPLE',
+          productId: coinPack.productId,
+          name: coinPack.name,
+          amount: coinPack.amount,
+          bonusAmount: coinPack.bonusAmount,
+          price: Number(coinPack.price),
+          currency: coinPack.currency,
+          isActive: coinPack.isActive,
+          sortOrder: coinPack.sortOrder,
+          createdAt: coinPack.createdAt,
+          updatedAt: coinPack.updatedAt,
+        },
+      };
+
+      return response;
+    } catch (error) {
+      // HttpException 已由 Service 層或 Guard 拋出，直接拋出
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // 其他未預期的錯誤
+      throw new HttpException('更新金幣儲值包失敗', 500);
     }
   }
 }
