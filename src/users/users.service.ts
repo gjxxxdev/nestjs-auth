@@ -203,6 +203,7 @@ export class UsersService {
           birthDate: true,
           gender: true,
           provider: true,
+          roleLevel: true,
           createdAt: true,
           updatedAt: true,
         },

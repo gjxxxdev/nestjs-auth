@@ -21,7 +21,7 @@ export class UsersController {
   @Get('all')
   @ApiOperation({ 
     summary: '查詢所有使用者',
-    description: '僅限管理員（roleLevel >= 9）查詢。返回所有使用者的會員序號、帳號、出生年月、性別、註冊方式、建立時間和更新時間。支援分頁查詢。' 
+    description: '僅限管理員（roleLevel >= 9）查詢。返回所有使用者的會員序號、帳號、出生年月、性別、註冊方式、權限等級、建立時間和更新時間。支援分頁查詢。' 
   })
   @ApiQuery({ name: 'page', required: false, type: 'number', example: 1, description: '頁碼（預設 1，必須 > 0）' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', example: 10, description: '每頁數量（預設 10，必須 > 0）' })
@@ -42,6 +42,7 @@ export class UsersController {
           birthDate: '1990-05-15T00:00:00.000Z',
           gender: 1,
           provider: 'email',
+          roleLevel: 9,
           createdAt: '2025-08-15T15:05:10.000Z',
           updatedAt: '2025-12-20T08:30:45.000Z',
         },
@@ -52,6 +53,7 @@ export class UsersController {
           birthDate: '1995-03-20T00:00:00.000Z',
           gender: 2,
           provider: 'google',
+          roleLevel: 1,
           createdAt: '2025-09-10T12:00:00.000Z',
           updatedAt: '2025-12-15T10:15:30.000Z',
         },

@@ -19,6 +19,9 @@ export class UserItemDto {
   @ApiProperty({ example: 'email', description: '註冊方式 (email/facebook/google/apple等)' })
   provider: string | null;
 
+  @ApiProperty({ example: 1, description: '權限等級 (1:普通, 5:小編, 9:Admin)' })
+  roleLevel: number;
+
   @ApiProperty({ example: '2025-08-15T15:05:10.000Z', description: '建立時間' })
   createdAt: Date;
 
