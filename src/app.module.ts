@@ -8,6 +8,7 @@ import { IapModule } from './iap/iap.module';
 import { BookstoreModule } from './bookstore/bookstore.module';
 import { OrdersModule } from './orders/orders.module';
 import { ActivitiesModule } from './activities/activities.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ActivitiesModule } from './activities/activities.module';
     IapModule,
     OrdersModule,
     ActivitiesModule,
+    AdminModule,
   ],
   providers: [PrismaService],
 })

@@ -71,6 +71,7 @@ model CoinLedger {
   balance      Int
   type         String   @db.VarChar(30)
   source       String?  @db.VarChar(50)
+  remark       String?  @db.VarChar(255)
   createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
 
   @@index([userId], map: "idx_user_id")
