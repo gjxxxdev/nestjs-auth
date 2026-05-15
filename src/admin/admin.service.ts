@@ -1,0 +1,154 @@
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
+import { GrantRewardRequestDto } from './dto/grant-reward-request.dto';
+import { GrantRewardResponseDto } from './dto/grant-reward-response.dto';
+import { UpdateCoinLedgerRemarkDto } from './dto/update-coin-ledger-remark.dto';
+
+@Injectable()
+export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * 管理員手動發放免費金幣獎勵給指定使用者
+   * 使用 Database Transaction 確保金幣增加與發放紀錄完全同步
+   *
+   * @param requestDto 發放請求（targetUserId, amount, reason）
+   * @param adminId 執行此操作的管理員 ID（用於審計日誌）
+   * @returns 發放結果（包含新餘額與發放時間戳）
+   * @throws NotFoundException 如果 targetUserId 不存在
+   * @throws BadRequestException 如果參數驗證失敗
+   */
+  async grantRewardToUser(
+    requestDto: GrantRewardRequestDto,
+    adminId: number,
+  ): Promise<GrantRewardResponseDto> {
+    const { targetUserId, amount, reason } = requestDto;
+
+    // ✅ Step 1: 檢查目標使用者是否存在
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      this.logger.warn(
+        `[GrantReward] 嘗試向不存在的使用者發放獎勵: targetUserId=${targetUserId}, admin=${adminId}`,
+      );
+      throw new NotFoundException(`目標使用者 (ID: ${targetUserId}) 不存在`);
+    }
+
+    // ✅ Step 2: 使用 Transaction 確保原子性操作
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          // 查詢該使用者最後一筆金幣流水，取得當前餘額
+          const lastLedger = await tx.coinLedger.findFirst({
+            where: { userId: targetUserId },
+            orderBy: { id: 'desc' },
+          });
+
+          const currentBalance = lastLedger?.balance || 0;
+          const newBalance = currentBalance + amount;
+
+          // 寫入新的金幣流水記錄
+          const ledgerEntry = await tx.coinLedger.create({
+            data: {
+              userId: targetUserId,
+              changeAmount: amount,
+              balance: newBalance,
+              type: 'ADMIN_GRANT', // ✅ 區分為管理員發放
+              source: reason, // ✅ 將原因寫入 source 欄位進行審計
+            },
+          });
+
+          this.logger.log(
+            `[GrantReward] 成功發放 | admin=${adminId}, target=${targetUserId}, amount=${amount}, newBalance=${newBalance}, reason=${reason}`,
+          );
+
+          return {
+            ledgerEntry,
+            newBalance,
+          };
+        },
+        { timeout: 5000 }, // 交易超時 5 秒
+      );
+
+      // ✅ Step 3: 構建成功回應
+      return {
+        success: true,
+        targetUserId,
+        amount,
+        newBalance: result.newBalance,
+        reason,
+        grantedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `[GrantReward] 交易失敗 | admin=${adminId}, target=${targetUserId}, amount=${amount}, error=${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException(`金幣發放失敗: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * 管理員編輯金幣流水紀錄的備註欄位
+   *
+   * @param coinLedgerId 金幣流水紀錄 ID
+   * @param updateDto 更新請求（remark 欄位）
+   * @param adminId 執行此操作的管理員 ID（用於審計日誌）
+   * @returns 更新後的金幣流水紀錄
+   * @throws NotFoundException 如果指定的 CoinLedger 紀錄不存在
+   */
+  async updateCoinLedgerRemark(
+    coinLedgerId: number,
+    updateDto: UpdateCoinLedgerRemarkDto,
+    adminId: number,
+  ) {
+    const { remark } = updateDto;
+
+    // ✅ Step 1: 檢查指定的 CoinLedger 紀錄是否存在
+    const coinLedger = await this.prisma.coinLedger.findUnique({
+      where: { id: coinLedgerId },
+    });
+
+    if (!coinLedger) {
+      this.logger.warn(
+        `[UpdateRemarkLedger] 嘗試編輯不存在的 CoinLedger 紀錄: id=${coinLedgerId}, admin=${adminId}`,
+      );
+      throw new NotFoundException(`金幣流水紀錄 (ID: ${coinLedgerId}) 不存在`);
+    }
+
+    // ✅ Step 2: 更新備註欄位
+    try {
+      const updatedLedger = await this.prisma.coinLedger.update({
+        where: { id: coinLedgerId },
+        data: {
+          remark: remark || null, // 允許傳入空字串以清除備註
+        },
+      });
+
+      this.logger.log(
+        `[UpdateRemarkLedger] 成功更新 | admin=${adminId}, coinLedgerId=${coinLedgerId}, remark=${remark}`,
+      );
+
+      return {
+        success: true,
+        id: updatedLedger.id,
+        userId: updatedLedger.userId,
+        changeAmount: updatedLedger.changeAmount,
+        balance: updatedLedger.balance,
+        type: updatedLedger.type,
+        source: updatedLedger.source,
+        remark: (updatedLedger as any).remark,
+        createdAt: updatedLedger.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `[UpdateRemarkLedger] 更新失敗 | admin=${adminId}, coinLedgerId=${coinLedgerId}, error=${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException(`更新備註失敗: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
