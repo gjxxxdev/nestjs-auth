@@ -276,7 +276,7 @@ export class BookstoreService {
         },
         select: {
           id: true,
-          main_menu_name: true,
+          main_menu_title: true,
           author: true,
           main_menu_image: true,
         },

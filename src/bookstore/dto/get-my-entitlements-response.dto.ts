@@ -9,9 +9,9 @@ export class EntitlementStoryDto {
   @ApiProperty({ example: 1, description: '故事 ID' })
   id: number;
 
-  /** 書籍名稱 */
-  @ApiProperty({ example: '小鎮失蹤手冊', description: '書籍名稱' })
-  main_menu_name: string;
+  /** 書籍標題（資料庫欄位：main_menu_title） */
+  @ApiProperty({ example: '小鎮失蹤手冊', description: '書籍標題（來源欄位：main_menu_title）', nullable: true, type: String })
+  main_menu_title: string | null;
 
   /** 作者名稱 */
   @ApiProperty({ example: '夏佩爾&烏奴奴', description: '作者名稱' })
