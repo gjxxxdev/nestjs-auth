@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { IapQueryService } from './iap-query.service';
 import { MyIapReceiptDto } from './dto/my-iap-receipt.dto';
 import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
+import { MyCoinLedgerResponseDto } from './dto/my-coin-ledger-response.dto';
 import { AdminIapReceiptsQueryDto } from './dto/admin-iap-receipts-query.dto';
 import { AdminIapReceiptsResponseDto } from './dto/admin-iap-receipts-response.dto';
 import { AdminCoinLedgerQueryDto } from './dto/admin-coin-ledger-query.dto';
@@ -37,7 +38,26 @@ export class IapQueryController {
 
   @Get('me/coins/ledger')
   @ApiOperation({ summary: '查詢我的金幣流水' })
-  getMyCoinLedger(@Req() req) {
+  @ApiResponse({
+    status: 200,
+    description: '成功取得金幣流水',
+    type: MyCoinLedgerResponseDto,
+    example: {
+      items: [
+        {
+          id: 101,
+          amount: -100,
+          balance: 250,
+          type: 'BOOK_PURCHASE',
+          source: 'ORDER:65',
+          orderId: '65',
+          story: { main_menu_title: '小鎮失蹤手冊' },
+          createdAt: '2026-11-19T08:30:00.000Z',
+        },
+      ],
+    },
+  })
+  getMyCoinLedger(@Req() req): Promise<MyCoinLedgerResponseDto> {
     return this.iapQueryService.getMyCoinLedger(req.user.userId);
   }
 

@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { UsersService } from '../users/users.service';
 import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
 import { MyCoinLedgerResponseDto } from './dto/my-coin-ledger-response.dto';
 import { AdminIapReceiptsResponseDto } from './dto/admin-iap-receipts-response.dto';
 import { AdminCoinLedgerResponseDto } from './dto/admin-coin-ledger-response.dto';
+
+const MAX_BOOK_ORDER_ID = BigInt('9223372036854775807');
 
 @Injectable()
 export class IapQueryService {
@@ -76,7 +79,14 @@ export class IapQueryService {
 
   // 3️⃣ 我的金幣流水
   async getMyCoinLedger(userId: number): Promise<MyCoinLedgerResponseDto> {
-    const rows = await this.prisma.$queryRaw<any[]>`
+    const rows = await this.prisma.$queryRaw<{
+      id: number;
+      change_amount: number;
+      balance: number;
+      type: string;
+      source: string | null;
+      created_at: Date;
+    }[]>`
       SELECT
         id,
         change_amount,
@@ -90,15 +100,53 @@ export class IapQueryService {
       LIMIT 50
     `;
 
+    const orderIds = new Set<bigint>();
+    for (const row of rows) {
+      if (row.type !== 'BOOK_PURCHASE') continue;
+
+      const match = /^ORDER:([1-9]\d{0,18})$/.exec(row.source ?? '');
+      if (!match || match[0] !== row.source) continue;
+
+      const orderId = BigInt(match[1]);
+      if (orderId <= MAX_BOOK_ORDER_ID) orderIds.add(orderId);
+    }
+
+    const orders = orderIds.size > 0
+      ? await this.prisma.$queryRaw<{
+          id: bigint;
+          story_id: number | null;
+          main_menu_title: string | null;
+        }[]>`
+          SELECT o.id, s.id AS story_id, s.main_menu_title
+          FROM book_orders o
+          LEFT JOIN StoryLists s ON s.id = o.story_list_id
+          WHERE o.user_id = ${BigInt(userId)}
+            AND o.id IN (${Prisma.join([...orderIds])})
+        `
+      : [];
+    const ordersBySource = new Map(orders.map((order) => [`ORDER:${order.id}`, order]));
+
     return {
-      items: rows.map((r) => ({
-        id: r.id,
-        amount: r.change_amount,
-        balance: r.balance,
-        type: r.type,
-        source: r.source,
-        createdAt: r.created_at,
-      })),
+      items: rows.map((row) => {
+        const item = {
+          id: row.id,
+          amount: row.change_amount,
+          balance: row.balance,
+          type: row.type,
+          source: row.source,
+          createdAt: row.created_at,
+        };
+        if (row.type !== 'BOOK_PURCHASE') return item;
+
+        const order = ordersBySource.get(row.source ?? '');
+        return {
+          ...item,
+          orderId: order?.id.toString() ?? null,
+          story: order && order.story_id !== null
+            ? { main_menu_title: order.main_menu_title }
+            : null,
+        };
+      }),
     };
   }
 
