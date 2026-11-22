@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { UsersService } from '../users/users.service';
 import { MyIapReceiptsResponseDto } from './dto/my-iap-receipts-response.dto';
+import { MyCoinLedgerDto } from './dto/my-coin-ledger.dto';
 import { MyCoinLedgerResponseDto } from './dto/my-coin-ledger-response.dto';
 import { AdminIapReceiptsResponseDto } from './dto/admin-iap-receipts-response.dto';
 import { AdminCoinLedgerResponseDto } from './dto/admin-coin-ledger-response.dto';
@@ -79,6 +80,14 @@ export class IapQueryService {
 
   // 3️⃣ 我的金幣流水
   async getMyCoinLedger(userId: number): Promise<MyCoinLedgerResponseDto> {
+    return { items: await this.getCoinLedgerItems(userId, 50, 0) };
+  }
+
+  private async getCoinLedgerItems(
+    userId: number,
+    limit: number,
+    offset: number,
+  ): Promise<MyCoinLedgerDto[]> {
     const rows = await this.prisma.$queryRaw<{
       id: number;
       change_amount: number;
@@ -97,7 +106,8 @@ export class IapQueryService {
       FROM coin_ledger
       WHERE user_id = ${userId}
       ORDER BY id DESC
-      LIMIT 50
+      LIMIT ${limit}
+      OFFSET ${offset}
     `;
 
     const orderIds = new Set<bigint>();
@@ -126,28 +136,26 @@ export class IapQueryService {
       : [];
     const ordersBySource = new Map(orders.map((order) => [`ORDER:${order.id}`, order]));
 
-    return {
-      items: rows.map((row) => {
-        const item = {
-          id: row.id,
-          amount: row.change_amount,
-          balance: row.balance,
-          type: row.type,
-          source: row.source,
-          createdAt: row.created_at,
-        };
-        if (row.type !== 'BOOK_PURCHASE') return item;
+    return rows.map((row) => {
+      const item = {
+        id: row.id,
+        amount: row.change_amount,
+        balance: row.balance,
+        type: row.type,
+        source: row.source,
+        createdAt: row.created_at,
+      };
+      if (row.type !== 'BOOK_PURCHASE') return item;
 
-        const order = ordersBySource.get(row.source ?? '');
-        return {
-          ...item,
-          orderId: order?.id.toString() ?? null,
-          story: order && order.story_id !== null
-            ? { main_menu_title: order.main_menu_title }
-            : null,
-        };
-      }),
-    };
+      const order = ordersBySource.get(row.source ?? '');
+      return {
+        ...item,
+        orderId: order?.id.toString() ?? null,
+        story: order && order.story_id !== null
+          ? { main_menu_title: order.main_menu_title }
+          : null,
+      };
+    });
   }
 
   // 4️⃣ 後台查帳：查詢特定使用者的金幣流水（含分頁）
@@ -168,34 +176,15 @@ export class IapQueryService {
     // 處理 BigInt 類型轉換
     const total = Number(countResult[0]?.total || 0);
 
-    // 2️⃣ 查詢金幣流水記錄
-    const rows = await this.prisma.$queryRaw<any[]>`
-      SELECT
-        id,
-        change_amount,
-        balance,
-        type,
-        source,
-        created_at
-      FROM coin_ledger
-      WHERE user_id = ${userId}
-      ORDER BY id DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `;
+    const items = await this.getCoinLedgerItems(userId, limit, offset);
 
     // 3️⃣ 使用 UsersService 透過 ORM 獲取用戶信息
     const userProfile = await this.usersService.getProfile(userId).catch(() => null);
 
     return {
-      items: rows.map((r) => ({
-        id: r.id,
-        amount: r.change_amount,
-        balance: r.balance,
-        type: r.type,
-        source: r.source,
-        createdAt: r.created_at,
-        userId: userId,
+      items: items.map((item) => ({
+        ...item,
+        userId,
         username: userProfile?.name || '未知用戶',
         email: userProfile?.email || 'N/A',
       })),
